@@ -322,8 +322,9 @@ export default function CrocEditor() {
     try {
       await commitSave(activeLevel, words);
       setSaveState("ok");
-    } catch {
+    } catch (err) {
       setSaveState("err");
+      showToast("Failed to save", err);
     } finally {
       setTimeout(() => setSaveState("idle"), 1800);
     }
