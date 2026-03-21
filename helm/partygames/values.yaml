@@ -1,6 +1,6 @@
 image:
   repository: grekodocker/partygames
-  tag: 9148287
+  tag: 2d4e8f9
   pullPolicy: Always
 
 service:
