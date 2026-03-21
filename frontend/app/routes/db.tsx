@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const API = "http://localhost:8080/api/v1";
+const API = "/api/v1";
 
 export default function DbViewer() {
   const [keys, setKeys] = useState<string[]>([]);

@@ -1,40 +1,25 @@
-frontend:
-  image:
-    repository: grekodocker/partygames-frontend
-    tag: latest
-    pullPolicy: Always
-  service:
-    type: ClusterIP
-    port: 80
-    targetPort: 3000
-  resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
-    requests:
-      cpu: "50m"
-      memory: "128Mi"
+image:
+  repository: grekodocker/partygames
+  tag: latest
+  pullPolicy: Always
 
-backend:
-  image:
-    repository: grekodocker/partygames-backend
-    tag: latest
-    pullPolicy: Always
-  service:
-    type: ClusterIP
-    port: 80
-    targetPort: 8080
-  resources:
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
-    requests:
-      cpu: "50m"
-      memory: "128Mi"
-  storage:
-    mountPath: /app/data
-    # storageClass: ""  # leave unset to use the cluster default StorageClass
-    size: 1Gi
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+resources:
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+  requests:
+    cpu: "50m"
+    memory: "256Mi"
+
+storage:
+  mountPath: /data
+  # storageClass: ""  # leave unset to use the cluster default StorageClass
+  size: 1Gi
 
 terminationGracePeriodSeconds: 2
 

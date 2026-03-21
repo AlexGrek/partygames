@@ -5,6 +5,8 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	bolt "go.etcd.io/bbolt"
@@ -210,9 +212,26 @@ func deleteValue(w http.ResponseWriter, r *http.Request, key string) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"key": key, "deleted": true})
 }
 
+// spaHandler serves static files and falls back to index.html for unknown paths,
+// enabling client-side routing in the SPA.
+type spaHandler struct {
+	dir        string
+	fileServer http.Handler
+}
+
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	path := filepath.Join(h.dir, filepath.Clean("/"+r.URL.Path))
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		http.ServeFile(w, r, filepath.Join(h.dir, "index.html"))
+		return
+	}
+	h.fileServer.ServeHTTP(w, r)
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "data.db", "path to bbolt database file")
+	staticDir := flag.String("static", "", "directory to serve as frontend (optional)")
 	flag.Parse()
 
 	var err error
@@ -225,6 +244,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/keys", handleKeys)
 	mux.HandleFunc("/api/v1/keys/", handleKeys)
+
+	if *staticDir != "" {
+		mux.Handle("/", spaHandler{
+			dir:        *staticDir,
+			fileServer: http.FileServer(http.Dir(*staticDir)),
+		})
+		log.Printf("serving frontend from %s", *staticDir)
+	}
 
 	log.Printf("listening on %s, db: %s", *addr, *dbPath)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
