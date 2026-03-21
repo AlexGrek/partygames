@@ -26,7 +26,11 @@ func errorResponse(w http.ResponseWriter, code int, msg string) {
 }
 
 func extractKey(r *http.Request) string {
-	return strings.TrimPrefix(r.URL.Path, "/api/v1/keys/")
+	key, _ := strings.CutPrefix(r.URL.Path, "/api/v1/keys/")
+	if key == r.URL.Path {
+		return ""
+	}
+	return key
 }
 
 func handleKeys(w http.ResponseWriter, r *http.Request) {
