@@ -17,10 +17,9 @@ run-backend:
 
 docker-push: build-frontend
 	docker buildx build --platform linux/amd64 -t $(IMAGE) --push .
-	sed -i '' 's/^  tag:.*/  tag: $(COMMIT)/' helm/partygames/values.yaml
-	@echo "Pushed $(IMAGE) and updated helm/partygames/values.yaml"
+	@echo "Pushed $(IMAGE)"
 
 helm-upgrade:
-	helm upgrade --install partygames ./helm/partygames -n partygames --create-namespace
+	helm upgrade --install partygames ./helm/partygames -n partygames --create-namespace --set image.tag=$(COMMIT)
 
 deploy: docker-push helm-upgrade

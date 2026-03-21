@@ -31,12 +31,12 @@ make helm-upgrade  # helm upgrade --install (shortcut)
 make deploy        # docker-push + helm-upgrade in one shot
 ```
 Image is tagged `grekodocker/partygames:<short-commit>`. The Makefile derives the tag from
-`git rev-parse --short HEAD` and writes it into `helm/partygames/values.yaml` automatically.
+`git rev-parse --short HEAD` and passes it to Helm via `--set image.tag=<commit>` at deploy time.
+`values.yaml` keeps `tag: latest` as a placeholder and is never modified during deploy.
 
 **Deploy loop — always follow this order:**
 1. `git commit` — commit all changes first; the image tag is the HEAD hash
-2. `make deploy` — builds frontend, pushes image, runs helm upgrade
-3. `git commit helm/partygames/values.yaml` — commit the updated image tag
+2. `make deploy` — builds frontend, pushes image, runs helm upgrade with the correct tag
 
 ## Architecture
 
