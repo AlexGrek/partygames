@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Upload, Trash2, Download, FolderOpen, File, RefreshCw, FolderPlus, ChevronRight, House } from "lucide-react";
+import { Upload, Trash2, Download, FolderOpen, File, RefreshCw, FolderPlus, ChevronRight, House, Eye, X, ImageIcon, Music, Video } from "lucide-react";
 
 const API_BASE = "/api/v1/files";
 
@@ -8,6 +8,16 @@ interface FileEntry {
   size: number;
   isDir: boolean;
   modTime: string;
+}
+
+type PreviewType = "image" | "audio" | "video";
+
+function getPreviewType(name: string): PreviewType | null {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif", "ico"].includes(ext)) return "image";
+  if (["mp3", "wav", "ogg", "flac", "aac", "m4a", "opus"].includes(ext)) return "audio";
+  if (["mp4", "webm", "ogv", "mov"].includes(ext)) return "video";
+  return null;
 }
 
 function formatBytes(bytes: number): string {
@@ -21,15 +31,78 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-/** Build a /api/v1/files/<seg1>/<seg2>/... URL. */
 function filePath(...segments: string[]): string {
   return `${API_BASE}/${segments.map(encodeURIComponent).join("/")}`;
 }
 
-/** Build the listing URL for a given path array. */
 function listUrl(pathSegments: string[]): string {
   if (pathSegments.length === 0) return API_BASE;
   return `${API_BASE}?path=${encodeURIComponent(pathSegments.join("/"))}`;
+}
+
+// ── Lightbox (images) ──────────────────────────────────────────────────────────
+function Lightbox({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+      >
+        <X size={20} />
+      </button>
+      <img
+        src={url}
+        alt={name}
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-neutral-400 font-mono">{name}</p>
+    </div>
+  );
+}
+
+// ── Media modal (audio / video) ────────────────────────────────────────────────
+function MediaModal({ url, name, type, onClose }: { url: string; name: string; type: "audio" | "video"; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-xl bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+          <div className="flex items-center gap-2 min-w-0">
+            {type === "audio" ? <Music size={16} className="text-purple-400 shrink-0" /> : <Video size={16} className="text-pink-400 shrink-0" />}
+            <span className="font-mono text-sm truncate">{name}</span>
+          </div>
+          <button onClick={onClose} className="ml-3 p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          {type === "audio" ? (
+            <audio src={url} controls autoPlay className="w-full" />
+          ) : (
+            <video src={url} controls autoPlay className="w-full rounded-lg max-h-[60vh]" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Delete confirm modal ───────────────────────────────────────────────────────
@@ -52,8 +125,7 @@ function DeleteConfirm({
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const url = filePath(...currentPath, name);
-      const res = await fetch(url, { method: "DELETE" });
+      const res = await fetch(filePath(...currentPath, name), { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       onDeleted();
     } catch (e) {
@@ -77,10 +149,7 @@ function DeleteConfirm({
           {err && <p className="mt-3 text-xs text-red-400">{err}</p>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/10">
-          <button
-            onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
-          >
+          <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors">
             Cancel
           </button>
           <button
@@ -124,8 +193,7 @@ function NewFolderModal({
     setCreating(true);
     setErr(null);
     try {
-      const url = filePath(...currentPath, trimmed);
-      const res = await fetch(url, { method: "MKCOL" });
+      const res = await fetch(filePath(...currentPath, trimmed), { method: "MKCOL" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       onCreated();
     } catch (e) {
@@ -153,10 +221,7 @@ function NewFolderModal({
           {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/10">
-          <button
-            onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
-          >
+          <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors">
             Cancel
           </button>
           <button
@@ -173,6 +238,15 @@ function NewFolderModal({
   );
 }
 
+// ── File icon ──────────────────────────────────────────────────────────────────
+function FileIcon({ name }: { name: string }) {
+  const type = getPreviewType(name);
+  if (type === "image") return <ImageIcon size={16} className="text-blue-400 shrink-0" />;
+  if (type === "audio") return <Music size={16} className="text-purple-400 shrink-0" />;
+  if (type === "video") return <Video size={16} className="text-pink-400 shrink-0" />;
+  return <File size={16} className="text-neutral-500 shrink-0" />;
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function FilesPage() {
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -184,6 +258,7 @@ export default function FilesPage() {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [currentPath, setCurrentPath] = useState<string[]>([]);
+  const [preview, setPreview] = useState<{ url: string; name: string; type: PreviewType } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = useCallback(async (path: string[] = currentPath) => {
@@ -209,14 +284,17 @@ export default function FilesPage() {
     fetchFiles(segments);
   };
 
+  const openPreview = (f: FileEntry) => {
+    const type = getPreviewType(f.name);
+    if (!type) return;
+    setPreview({ url: filePath(...currentPath, f.name), name: f.name, type });
+  };
+
   const uploadFile = async (file: File) => {
     setUploading(true);
     setUploadProgress(`Uploading ${file.name}…`);
     try {
-      const res = await fetch(filePath(...currentPath, file.name), {
-        method: "PUT",
-        body: file,
-      });
+      const res = await fetch(filePath(...currentPath, file.name), { method: "PUT", body: file });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await fetchFiles();
     } catch (e) {
@@ -242,6 +320,12 @@ export default function FilesPage() {
 
   return (
     <>
+      {preview && preview.type === "image" && (
+        <Lightbox url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
+      )}
+      {preview && (preview.type === "audio" || preview.type === "video") && (
+        <MediaModal url={preview.url} name={preview.name} type={preview.type} onClose={() => setPreview(null)} />
+      )}
       {deleteTarget && (
         <DeleteConfirm
           name={deleteTarget.name}
@@ -272,7 +356,6 @@ export default function FilesPage() {
         )}
 
         <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between gap-4">
-          {/* Breadcrumb */}
           <nav className="flex items-center gap-1 text-sm min-w-0 flex-1">
             <button
               onClick={() => navigate([])}
@@ -287,9 +370,7 @@ export default function FilesPage() {
                 <button
                   onClick={() => navigate(currentPath.slice(0, i + 1))}
                   className={`truncate transition-colors ${
-                    i === currentPath.length - 1
-                      ? "text-white font-medium"
-                      : "text-neutral-400 hover:text-white"
+                    i === currentPath.length - 1 ? "text-white font-medium" : "text-neutral-400 hover:text-white"
                   }`}
                 >
                   {segment}
@@ -322,12 +403,7 @@ export default function FilesPage() {
               <Upload size={14} />
               {uploading ? uploadProgress : "Upload"}
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={handleFileInput}
-            />
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileInput} />
           </div>
         </header>
 
@@ -359,56 +435,75 @@ export default function FilesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/8">
-                  {files.map((f) => (
-                    <tr key={f.name} className="hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5 font-mono text-neutral-200">
-                          {f.isDir ? (
-                            <FolderOpen size={16} className="text-yellow-500 shrink-0" />
-                          ) : (
-                            <File size={16} className="text-neutral-500 shrink-0" />
-                          )}
-                          {f.isDir ? (
+                  {files.map((f) => {
+                    const previewType = !f.isDir ? getPreviewType(f.name) : null;
+                    return (
+                      <tr key={f.name} className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5 font-mono text-neutral-200">
+                            {f.isDir ? (
+                              <FolderOpen size={16} className="text-yellow-500 shrink-0" />
+                            ) : (
+                              <FileIcon name={f.name} />
+                            )}
+                            {f.isDir ? (
+                              <button
+                                onClick={() => navigate([...currentPath, f.name])}
+                                className="truncate max-w-xs hover:text-white text-yellow-400 transition-colors text-left"
+                              >
+                                {f.name}
+                              </button>
+                            ) : previewType ? (
+                              <button
+                                onClick={() => openPreview(f)}
+                                className="truncate max-w-xs hover:text-white transition-colors text-left"
+                              >
+                                {f.name}
+                              </button>
+                            ) : (
+                              <span className="truncate max-w-xs">{f.name}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-neutral-400 tabular-nums">
+                          {f.isDir ? "—" : formatBytes(f.size)}
+                        </td>
+                        <td className="px-4 py-3 text-neutral-500 hidden sm:table-cell">
+                          {formatDate(f.modTime)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {previewType && (
+                              <button
+                                onClick={() => openPreview(f)}
+                                className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-white/15 text-neutral-300 transition-colors"
+                              >
+                                <Eye size={12} />
+                                Preview
+                              </button>
+                            )}
+                            {!f.isDir && (
+                              <a
+                                href={filePath(...currentPath, f.name)}
+                                download={f.name}
+                                className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-white/15 text-neutral-300 transition-colors"
+                              >
+                                <Download size={12} />
+                                Download
+                              </a>
+                            )}
                             <button
-                              onClick={() => navigate([...currentPath, f.name])}
-                              className="truncate max-w-xs hover:text-white text-yellow-400 transition-colors text-left"
+                              onClick={() => setDeleteTarget(f)}
+                              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-red-900 text-neutral-300 hover:text-red-300 transition-colors"
                             >
-                              {f.name}
+                              <Trash2 size={12} />
+                              Delete
                             </button>
-                          ) : (
-                            <span className="truncate max-w-xs">{f.name}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-neutral-400 tabular-nums">
-                        {f.isDir ? "—" : formatBytes(f.size)}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-500 hidden sm:table-cell">
-                        {formatDate(f.modTime)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {!f.isDir && (
-                            <a
-                              href={filePath(...currentPath, f.name)}
-                              download={f.name}
-                              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-white/15 text-neutral-300 transition-colors"
-                            >
-                              <Download size={12} />
-                              Download
-                            </a>
-                          )}
-                          <button
-                            onClick={() => setDeleteTarget(f)}
-                            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-red-900 text-neutral-300 hover:text-red-300 transition-colors"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
