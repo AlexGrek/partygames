@@ -6,10 +6,10 @@ type Level = (typeof LEVELS)[number];
 
 const LEVEL_LABELS: Record<Level, string> = {
   1: "Easy",
-  2: "Level 2",
-  3: "Medium",
-  4: "Level 4",
-  5: "Hard",
+  2: "Normal",
+  3: "Interesting",
+  4: "Complicated",
+  5: "Impossible",
 };
 
 const LEVEL_COLORS: Record<Level, string> = {
