@@ -53,7 +53,7 @@ async function fetchWords(level: number): Promise<string[]> {
 export default function Crocodile() {
   const [allWords, setAllWords] = useState<Record<number, string[]>>({});
   const [currentWord, setCurrentWord] = useState<string>("");
-  const [currentLevel, setCurrentLevel] = useState<number>(3);
+  const [currentLevel, setCurrentLevel] = useState<number>(2);
   const [loading, setLoading] = useState(true);
   // key increments on each new word to reset CSS animations
   const [wordKey, setWordKey] = useState(0);
@@ -76,7 +76,7 @@ export default function Crocodile() {
       }
       setAllWords(result);
       setLoading(false);
-      pickWordFrom(3, result);
+      pickWordFrom(2, result);
     }
     loadWords();
     return () => {
