@@ -327,7 +327,7 @@ export default function DbViewer() {
         />
       )}
 
-      <div className="min-h-screen flex flex-col pt-12">
+      <div className="h-screen flex flex-col pt-12">
         <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
           <h1 className="text-xl font-semibold tracking-tight">DB Editor</h1>
           <div className="flex items-center gap-2">
