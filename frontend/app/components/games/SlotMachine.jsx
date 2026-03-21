@@ -231,7 +231,7 @@ const generateParticles = (winEmoji) =>
       "--sway":  `${((Math.random() - 0.5) * 110).toFixed(0)}px`,
       "--delay": `${(Math.random() * 0.9).toFixed(2)}s`,
       "--dur":   `${(2.4 + Math.random() * 1.4).toFixed(2)}s`,
-      "--size":  `${(1.6 + Math.random() * 2.4).toFixed(1)}rem`,
+      "--size":  `${(3.5 + Math.random() * 4.0).toFixed(1)}rem`,
     },
   }));
 
