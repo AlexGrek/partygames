@@ -12,4 +12,10 @@ export const APPS: AppEntry[] = [
   { to: "/db", label: "DB Viewer", emoji: "🗄️", category: "utils" },
   { to: "/files", label: "Files", emoji: "📁", category: "utils" },
   { to: "/croc-editor", label: "Croc Editor", emoji: "✏️", category: "utils" },
+  {
+    to: "/melody-editor",
+    label: "Melody Editor",
+    emoji: "✨",
+    category: "utils",
+  },
 ];
