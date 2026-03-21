@@ -4,6 +4,8 @@ import { Tally4, House } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { APPS } from "../apps";
 
+const partyApps = APPS.filter((a) => a.category === "party");
+
 export default function TopBar() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -55,7 +57,7 @@ export default function TopBar() {
               </span>
               Party Games
             </Link>
-            {APPS.map((app) => (
+            {partyApps.map((app) => (
               <Link
                 key={app.to}
                 to={app.to}

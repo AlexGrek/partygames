@@ -2,11 +2,12 @@ export interface AppEntry {
   to: string;
   label: string;
   emoji: string;
+  category: "party" | "utils";
 }
 
 export const APPS: AppEntry[] = [
-  { to: "/crocodile", label: "Crocodile", emoji: "🐊" },
-  { to: "/slopmachine", label: "SlopMachine", emoji: "🎰" },
-  { to: "/db", label: "DB Viewer", emoji: "🗄️" },
-  { to: "/files", label: "Files", emoji: "📁" },
+  { to: "/crocodile", label: "Crocodile", emoji: "🐊", category: "party" },
+  { to: "/slopmachine", label: "SlopMachine", emoji: "🎰", category: "party" },
+  { to: "/db", label: "DB Viewer", emoji: "🗄️", category: "utils" },
+  { to: "/files", label: "Files", emoji: "📁", category: "utils" },
 ];
