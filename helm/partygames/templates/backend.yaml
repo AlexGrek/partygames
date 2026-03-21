@@ -20,6 +20,10 @@ spec:
       - name: {{ .Chart.Name }}
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+        - -addr=:{{ .Values.service.targetPort }}
+        - -db={{ .Values.storage.mountPath }}/data.db
+        - -static=./static
         ports:
         - containerPort: {{ .Values.service.targetPort }}
         resources:
