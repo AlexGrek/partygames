@@ -21,6 +21,15 @@ const LS_PREFIX = "croc-used-";
 const LETTER_DELAY = 0.07; // seconds between each letter reveal
 const TIMER_START_DELAY = 3000; // ms after last letter before timer starts
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function getUsed(level: number): Set<string> {
   try {
     const raw = localStorage.getItem(`${LS_PREFIX}${level}`);
@@ -50,8 +59,9 @@ async function fetchWords(level: number): Promise<string[]> {
   return Array.isArray(words) ? words : [];
 }
 
-const DEFAULT_CAPABILITY = "llm.hf.co/INSAIT-Institute/MamayLM-Gemma-2-9B-IT-v0.1-GGUF:Q4_K_M";
+const DEFAULT_CAPABILITY = "llm.huihui_ai/qwen3.5-abliterated:2B";
 const DEFAULT_REQUEST = `Поясни значення слова "{word}"`;
+const DEFAULT_SYSTEM = "Ти - дуже розумний помічник, який може допомогти пояснити значення слів українською мовою. Ти відповідаєш коротко, але чітко.";
 const OFFLOADMQ_API = "/api/v1/offloadmq";
 const DB_API = "/api/v1/keys";
 
@@ -82,14 +92,14 @@ export default function Crocodile() {
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explainError, setExplainError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const explainConfigRef = useRef<{ capability: string; request: string } | null>(null);
+  const explainConfigRef = useRef<{ capability: string; request: string; system: string } | null>(null);
 
   const timerStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     async function loadWords() {
-      const [result, capability, request] = await Promise.all([
+      const [result, capability, request, system] = await Promise.all([
         (async () => {
           const r: Record<number, string[]> = {};
           for (let i = 1; i <= 5; i++) {
@@ -104,8 +114,9 @@ export default function Crocodile() {
         })(),
         fetchStringKey("croc::explain-capability", DEFAULT_CAPABILITY),
         fetchStringKey("croc::explain-request", DEFAULT_REQUEST),
+        fetchStringKey("croc::explain-system-prompt", DEFAULT_SYSTEM),
       ]);
-      explainConfigRef.current = { capability, request };
+      explainConfigRef.current = { capability, request, system };
       setAllWords(result);
       setLoading(false);
       pickWordFrom(2, result);
@@ -159,26 +170,31 @@ export default function Crocodile() {
       }
 
       // 2. Ask LLM via OffloadMQ
-      const cfg = explainConfigRef.current ?? { capability: DEFAULT_CAPABILITY, request: DEFAULT_REQUEST };
+      const cfg = explainConfigRef.current ?? { capability: DEFAULT_CAPABILITY, request: DEFAULT_REQUEST, system: DEFAULT_SYSTEM };
       const prompt = cfg.request.replace("{word}", word);
+      const requestBody = {
+        capability: cfg.capability,
+        payload: { prompt, system: cfg.system },
+        urgent: true,
+      };
+      console.log("[explain] sending to OffloadMQ:\n" + JSON.stringify(requestBody, null, 2));
+
       const res = await fetch(`${OFFLOADMQ_API}/api/task/submit_blocking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          capability: cfg.capability,
-          payload: { prompt },
-          urgent: true,
-        }),
+        body: JSON.stringify(requestBody),
         signal: ctrl.signal,
       });
 
       if (!res.ok) {
         const text = await res.text().catch(() => `HTTP ${res.status}`);
+        console.error("[explain] HTTP error:", res.status, text);
         throw new Error(text);
       }
 
       const data = await res.json();
-      const text: string = data?.result?.response ?? data?.result?.stdout ?? "";
+      console.log("[explain] response:", JSON.stringify(data, null, 2));
+      const text: string = data?.result?.message?.content ?? data?.result?.response ?? data?.result?.stdout ?? "";
       if (!text) throw new Error("Empty response from LLM");
 
       setExplanation(text);
@@ -207,9 +223,12 @@ export default function Crocodile() {
   function pickWordFrom(level: number, words: Record<number, string[]>) {
     const pool = words[level] ?? FALLBACK_WORDS[level];
     const used = getUsed(level);
-    const available = pool.filter((w) => !used.has(w));
-    const source = available.length > 0 ? available : pool;
-    const word = source[Math.floor(Math.random() * source.length)] ?? "";
+    let available = pool.filter((w) => !used.has(w));
+    if (available.length === 0) {
+      localStorage.removeItem(`${LS_PREFIX}${level}`);
+      available = [...pool];
+    }
+    const word = shuffle(available)[0] ?? "";
     markUsed(level, word);
     setCurrentWord(word);
     setCurrentLevel(level);
