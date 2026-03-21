@@ -361,6 +361,9 @@ func main() {
 		"croc::words-level-3":   []string{},
 		"croc::words-level-4":   []string{},
 		"croc::words-level-5":   []string{},
+		"melody::categories":        []string{},
+		"melody::items":             []interface{}{},
+		"melody::first-guess-delay": 15,
 	})
 
 	mux := http.NewServeMux()
