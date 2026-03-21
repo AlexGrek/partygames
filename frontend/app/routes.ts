@@ -6,4 +6,5 @@ export default [
   route("slopmachine", "routes/slopmachine.tsx"),
   route("db", "routes/db.tsx"),
   route("files", "routes/files.tsx"),
+  route("croc-editor", "routes/croc-editor.tsx"),
 ] satisfies RouteConfig;
