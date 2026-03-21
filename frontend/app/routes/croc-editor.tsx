@@ -60,6 +60,11 @@ function clean(words: string[]): string[] {
   return words.map((w) => w.trim()).filter(Boolean);
 }
 
+function isYamlValid(text: string): boolean {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines.length === 0 || lines.every((l) => l.startsWith("- "));
+}
+
 // ── Move dropdown ─────────────────────────────────────────────────────────────
 
 function MoveDropdown({ word, fromLevel, moving, onMove }: {
@@ -219,7 +224,11 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
             value={yaml}
             onChange={(e) => setYaml(e.target.value)}
             onKeyDown={handleYamlKey}
-            className="w-full h-80 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-base font-mono text-neutral-200 resize-y focus:outline-none focus:border-white/25 transition-colors leading-relaxed"
+            className="w-full h-80 bg-black/30 rounded-xl px-4 py-3 text-base font-mono text-neutral-200 resize-y focus:outline-none transition-colors leading-relaxed"
+            style={{
+              border: `1px solid ${isYamlValid(yaml) ? "rgba(255,255,255,0.1)" : "rgba(239,68,68,0.6)"}`,
+              boxShadow: isYamlValid(yaml) ? undefined : "0 0 0 1px rgba(239,68,68,0.2)",
+            }}
             placeholder={"- слово\n- другое слово"}
             spellCheck={false}
           />
@@ -386,8 +395,6 @@ export default function CrocEditor() {
     );
   }
 
-  const color = LEVEL_COLORS[activeLevel];
-
   return (
     <div className="min-h-screen pt-20 pb-12 px-4 max-w-xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -423,7 +430,7 @@ export default function CrocEditor() {
       </div>
 
       {/* Active editor — remounts on tab switch */}
-      <div className="rounded-2xl border bg-white/3 p-5" style={{ borderColor: `${color}40` }}>
+      <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
         <LevelEditor
           key={`${activeLevel}-${refreshKey}`}
           ref={editorRef}
