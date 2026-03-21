@@ -148,6 +148,13 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
     const effectiveWords = altMode ? parseYaml(yaml) : clean(words);
     const isDirty = JSON.stringify(effectiveWords) !== JSON.stringify(initialWords);
 
+    const [yamlValid, setYamlValid] = useState(true);
+    useEffect(() => {
+      if (!altMode) return;
+      const t = setTimeout(() => setYamlValid(isYamlValid(yaml)), 400);
+      return () => clearTimeout(t);
+    }, [yaml, altMode]);
+
     useEffect(() => {
       if (!altMode) newWordRef.current?.focus();
     }, [altMode]);
@@ -226,8 +233,8 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
             onKeyDown={handleYamlKey}
             className="w-full h-80 bg-black/30 rounded-xl px-4 py-3 text-base font-mono text-neutral-200 resize-y focus:outline-none transition-colors leading-relaxed"
             style={{
-              border: `1px solid ${isYamlValid(yaml) ? "rgba(255,255,255,0.1)" : "rgba(239,68,68,0.6)"}`,
-              boxShadow: isYamlValid(yaml) ? undefined : "0 0 0 1px rgba(239,68,68,0.2)",
+              border: `1px solid ${yamlValid ? "rgba(255,255,255,0.1)" : "rgba(239,68,68,0.6)"}`,
+              boxShadow: yamlValid ? undefined : "0 0 0 1px rgba(239,68,68,0.2)",
             }}
             placeholder={"- слово\n- другое слово"}
             spellCheck={false}
