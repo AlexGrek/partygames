@@ -290,6 +290,7 @@ export default function CrocEditor() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [movingWord, setMovingWord] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<{ message: string; detail: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
   const editorRef = useRef<LevelEditorHandle>(null);
@@ -369,6 +370,7 @@ export default function CrocEditor() {
       const toNext = toWords.includes(word) ? toWords : [...toWords, word];
       await Promise.all([apiSave(fromLevel, fromWords), apiSave(toLevel, toNext)]);
       await refreshAll();
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       showToast("Move failed", err);
     } finally {
@@ -423,7 +425,7 @@ export default function CrocEditor() {
       {/* Active editor — remounts on tab switch */}
       <div className="rounded-2xl border bg-white/3 p-5" style={{ borderColor: `${color}40` }}>
         <LevelEditor
-          key={activeLevel}
+          key={`${activeLevel}-${refreshKey}`}
           ref={editorRef}
           level={activeLevel}
           initialWords={dbWords[activeLevel]}
