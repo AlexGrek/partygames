@@ -23,18 +23,20 @@ cd backend && go build ./... # verify compilation
 cd backend && go mod tidy   # sync dependencies
 ```
 
-### Docker
+### Docker & Deploy
 ```sh
-make docker-push  # build frontend locally, build linux/amd64 image, push to Docker Hub,
-                  # and update helm/partygames/values.yaml tag to the current git short hash
+make docker-push   # build frontend locally, build linux/amd64 image, push to Docker Hub,
+                   # and update helm/partygames/values.yaml tag to the current git short hash
+make helm-upgrade  # helm upgrade --install (shortcut)
+make deploy        # docker-push + helm-upgrade in one shot
 ```
 Image is tagged `grekodocker/partygames:<short-commit>`. The Makefile derives the tag from
 `git rev-parse --short HEAD` and writes it into `helm/partygames/values.yaml` automatically.
 
-### Helm
-```sh
-helm upgrade --install partygames ./helm/partygames -n partygames --create-namespace
-```
+**Deploy loop — always follow this order:**
+1. `git commit` — commit all changes first; the image tag is the HEAD hash
+2. `make deploy` — builds frontend, pushes image, runs helm upgrade
+3. `git commit helm/partygames/values.yaml` — commit the updated image tag
 
 ## Architecture
 
@@ -103,3 +105,21 @@ args:
 - `make docker-push` builds the frontend on the host (avoids slow QEMU emulation on Apple Silicon).
 - The image is always built for `linux/amd64` via `docker buildx --platform linux/amd64`.
 - The Go binary is compiled with `CGO_ENABLED=0` for a fully static binary compatible with `alpine`.
+
+## DevOps Role
+
+### Goals
+- **Deployment simplicity** — one command (`make deploy`) takes you from committed code to running pod. No manual steps, no copy-pasting.
+- **Minimal image size** — multi-stage Dockerfile: Go compiled in `golang:alpine`, final image is `alpine` with only the static binary + frontend assets. No build tools, no shell scripts in prod.
+- **amd64 for production, arm64 for Mac debugging** — `make deploy` always targets `linux/amd64` (Kubernetes cluster). Use `docker build --platform linux/arm64` locally if you need to debug the container on Apple Silicon without QEMU overhead.
+
+### Known gotchas
+
+**YAML parses all-numeric git hashes as integers.**
+Helm values read `tag: 9148287` as the integer 9148287, which renders as `9.148287e+06` — an invalid image name. The sed in `make docker-push` writes the tag unquoted; if the short hash happens to be all digits, quote it manually in `values.yaml` (`tag: "9148287"`) or re-run after the next commit adds a letter.
+
+**StatefulSet pods do not self-heal during CrashLoopBackOff.**
+A rolling update won't replace a pod that is crashing. If a pod is stuck on a bad spec, delete it manually (`kubectl delete pod <name> -n partygames`) to force the StatefulSet to recreate it with the current spec.
+
+**`args` without `command` in Kubernetes replaces `CMD` entirely.**
+The Dockerfile uses `CMD ["./server", ...]` (no `ENTRYPOINT`). If the Helm template sets only `args:`, Kubernetes replaces the whole CMD and tries to exec the first arg as a binary. The StatefulSet template must set `command: ["./server"]` alongside `args:`.
