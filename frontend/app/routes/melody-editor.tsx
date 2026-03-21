@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, Play, Pause, Upload, Loader, Music, ListMusic, X, FolderInput,
+  CheckCircle2, AlertCircle,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -259,6 +260,16 @@ function SongRow({
   );
 }
 
+// ── Batch upload types ─────────────────────────────────────────────────────
+interface BatchItem {
+  id: string;
+  file: File;
+  title: string;
+  artist: string;
+  status: "pending" | "uploading" | "done" | "error";
+  error?: string;
+}
+
 // ── AddSongForm ────────────────────────────────────────────────────────────
 function AddSongForm({
   category,
@@ -272,9 +283,33 @@ function AddSongForm({
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [batchUploading, setBatchUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isBatchMode = batchItems.length > 0;
   const canAdd = title.trim().length > 0 && artist.trim().length > 0 && file !== null && !uploading;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    // Reset input so same files can be re-selected after clearing
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    if (files.length === 1) {
+      setFile(files[0]);
+      setBatchItems([]);
+      const guess = guessFromFilename(files[0].name);
+      if (!title.trim()) setTitle(guess.title);
+      if (!artist.trim()) setArtist(guess.artist);
+    } else {
+      setFile(null);
+      setBatchItems(files.map((f) => {
+        const guess = guessFromFilename(f.name);
+        return { id: crypto.randomUUID(), file: f, title: guess.title, artist: guess.artist, status: "pending" };
+      }));
+    }
+  }
 
   async function handleAdd() {
     if (!canAdd || !file) return;
@@ -293,88 +328,236 @@ function AddSongForm({
     }
   }
 
+  async function handleBatchUpload() {
+    const pending = batchItems.filter((b) => b.status === "pending" || b.status === "error");
+    if (pending.length === 0 || batchUploading) return;
+    setBatchUploading(true);
+
+    for (const item of pending) {
+      setBatchItems((prev) =>
+        prev.map((b) => b.id === item.id ? { ...b, status: "uploading" } : b)
+      );
+      try {
+        const filePath = await uploadAudio(item.file);
+        await onAdd({ title: item.title.trim() || item.file.name, artist: item.artist.trim(), file: filePath, category });
+        setBatchItems((prev) =>
+          prev.map((b) => b.id === item.id ? { ...b, status: "done" } : b)
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setBatchItems((prev) =>
+          prev.map((b) => b.id === item.id ? { ...b, status: "error", error: msg } : b)
+        );
+      }
+    }
+
+    setBatchUploading(false);
+  }
+
+  function clearBatch() {
+    setBatchItems([]);
+  }
+
+  const allDone = batchItems.length > 0 && batchItems.every((b) => b.status === "done");
+  const hasErrors = batchItems.some((b) => b.status === "error");
+  const pendingCount = batchItems.filter((b) => b.status === "pending" || b.status === "error").length;
+
   return (
     <div className="mt-3 pt-4 border-t border-white/8 flex flex-col gap-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-neutral-600">Add Song</p>
-
-      <div className="flex gap-2">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder="Title"
-          className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-white/25 transition-colors"
-        />
-        <input
-          value={artist}
-          onChange={(e) => setArtist(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder="Artist"
-          className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-white/25 transition-colors"
-        />
-      </div>
-
-      <div className="flex gap-2 items-center">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all truncate ${
-            file
-              ? "border-purple-500/40 bg-purple-900/20 text-purple-300"
-              : "border-dashed border-white/15 bg-white/3 text-neutral-500 hover:border-white/25 hover:text-neutral-300"
-          }`}
-        >
-          {file ? (
-            <>
-              <Music size={14} className="shrink-0" />
-              <span className="truncate">{file.name}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                className="ml-auto shrink-0 text-neutral-500 hover:text-neutral-200"
-              >
-                <X size={13} />
-              </button>
-            </>
-          ) : (
-            <>
-              <Upload size={14} className="shrink-0" />
-              Choose audio file…
-            </>
-          )}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*,video/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            setFile(f);
-            if (f) {
-              const guess = guessFromFilename(f.name);
-              if (!title.trim()) setTitle(guess.title);
-              if (!artist.trim()) setArtist(guess.artist);
-            }
-          }}
-        />
-
-        <button
-          onClick={handleAdd}
-          disabled={!canAdd}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-35 disabled:cursor-not-allowed text-white text-sm font-medium transition-all shrink-0"
-        >
-          {uploading ? (
-            <><Loader size={14} className="animate-spin" /> Uploading…</>
-          ) : (
-            <><Plus size={14} /> Add</>
-          )}
-        </button>
-      </div>
-
-      {error && (
-        <p className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
-          {error}
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-600 flex-1">
+          {isBatchMode ? `Batch Upload — ${batchItems.length} files` : "Add Song"}
         </p>
+        {isBatchMode && (
+          <button
+            onClick={clearBatch}
+            className="text-xs text-neutral-600 hover:text-neutral-400 transition-colors flex items-center gap-1"
+          >
+            <X size={11} /> Clear
+          </button>
+        )}
+      </div>
+
+      {/* ── Batch queue ── */}
+      {isBatchMode && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            {batchItems.map((item) => (
+              <div
+                key={item.id}
+                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-colors ${
+                  item.status === "done"
+                    ? "border-green-800/40 bg-green-950/20"
+                    : item.status === "error"
+                    ? "border-red-800/40 bg-red-950/20"
+                    : item.status === "uploading"
+                    ? "border-purple-700/40 bg-purple-950/20"
+                    : "border-white/8 bg-white/3"
+                }`}
+              >
+                {/* Status icon */}
+                <div className="shrink-0 w-5 flex items-center justify-center">
+                  {item.status === "uploading" && <Loader size={13} className="text-purple-400 animate-spin" />}
+                  {item.status === "done" && <CheckCircle2 size={13} className="text-green-400" />}
+                  {item.status === "error" && <span title={item.error}><AlertCircle size={13} className="text-red-400" /></span>}
+                  {item.status === "pending" && <Music size={13} className="text-neutral-600" />}
+                </div>
+
+                {/* Editable fields */}
+                <div className="flex flex-1 flex-col gap-0.5 min-w-0">
+                  <input
+                    value={item.title}
+                    onChange={(e) =>
+                      setBatchItems((prev) =>
+                        prev.map((b) => b.id === item.id ? { ...b, title: e.target.value } : b)
+                      )
+                    }
+                    disabled={item.status === "uploading" || item.status === "done"}
+                    className="w-full bg-transparent text-sm text-white focus:outline-none focus:bg-white/8 rounded px-1 -mx-1 transition-colors placeholder-neutral-600 disabled:opacity-50"
+                    placeholder="Title"
+                  />
+                  <input
+                    value={item.artist}
+                    onChange={(e) =>
+                      setBatchItems((prev) =>
+                        prev.map((b) => b.id === item.id ? { ...b, artist: e.target.value } : b)
+                      )
+                    }
+                    disabled={item.status === "uploading" || item.status === "done"}
+                    className="w-full bg-transparent text-xs text-neutral-500 focus:outline-none focus:bg-white/8 rounded px-1 -mx-1 transition-colors placeholder-neutral-700 disabled:opacity-50"
+                    placeholder="Artist"
+                  />
+                </div>
+
+                {/* Filename */}
+                <span className="hidden md:block text-xs text-neutral-700 font-mono truncate max-w-[110px] shrink-0" title={item.file.name}>
+                  {item.file.name}
+                </span>
+
+                {/* Remove */}
+                {item.status !== "uploading" && item.status !== "done" && (
+                  <button
+                    onClick={() => setBatchItems((prev) => prev.filter((b) => b.id !== item.id))}
+                    className="text-neutral-700 hover:text-red-400 transition-colors shrink-0"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-white/15 bg-white/3 text-neutral-500 hover:border-white/25 hover:text-neutral-300 text-sm transition-all"
+            >
+              <Upload size={13} /> Add more…
+            </button>
+            <div className="flex-1" />
+            {allDone ? (
+              <button
+                onClick={clearBatch}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-800/40 hover:bg-green-700/40 text-green-300 text-sm font-medium transition-all shrink-0"
+              >
+                <CheckCircle2 size={14} /> Done
+              </button>
+            ) : (
+              <button
+                onClick={handleBatchUpload}
+                disabled={pendingCount === 0 || batchUploading}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-35 disabled:cursor-not-allowed text-white text-sm font-medium transition-all shrink-0"
+              >
+                {batchUploading ? (
+                  <><Loader size={14} className="animate-spin" /> Uploading…</>
+                ) : hasErrors ? (
+                  <><Upload size={14} /> Retry failed</>
+                ) : (
+                  <><Upload size={14} /> Upload {pendingCount}</>
+                )}
+              </button>
+            )}
+          </div>
+        </>
       )}
+
+      {/* ── Single file form ── */}
+      {!isBatchMode && (
+        <>
+          <div className="flex gap-2">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Title"
+              className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-white/25 transition-colors"
+            />
+            <input
+              value={artist}
+              onChange={(e) => setArtist(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Artist"
+              className="flex-1 min-w-0 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-white/25 transition-colors"
+            />
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all truncate ${
+                file
+                  ? "border-purple-500/40 bg-purple-900/20 text-purple-300"
+                  : "border-dashed border-white/15 bg-white/3 text-neutral-500 hover:border-white/25 hover:text-neutral-300"
+              }`}
+            >
+              {file ? (
+                <>
+                  <Music size={14} className="shrink-0" />
+                  <span className="truncate">{file.name}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    className="ml-auto shrink-0 text-neutral-500 hover:text-neutral-200"
+                  >
+                    <X size={13} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Upload size={14} className="shrink-0" />
+                  Choose file(s)…
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleAdd}
+              disabled={!canAdd}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-35 disabled:cursor-not-allowed text-white text-sm font-medium transition-all shrink-0"
+            >
+              {uploading ? (
+                <><Loader size={14} className="animate-spin" /> Uploading…</>
+              ) : (
+                <><Plus size={14} /> Add</>
+              )}
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*,video/*"
+        multiple
+        className="hidden"
+        onChange={handleFileChange}
+      />
     </div>
   );
 }
@@ -533,7 +716,7 @@ export default function MelodyEditor() {
   const [items, setItems] = useState<MelodyItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>("__categories__");
   const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   function showError(msg: string) {
     setToast(msg);

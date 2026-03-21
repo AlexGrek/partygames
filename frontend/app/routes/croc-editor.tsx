@@ -431,7 +431,7 @@ export default function CrocEditor() {
   const [movingWord, setMovingWord] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<{ message: string; detail: string } | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const editorRef = useRef<LevelEditorHandle>(null);
 
   function showToast(message: string, err: unknown) {
