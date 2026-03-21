@@ -356,6 +356,11 @@ func main() {
 	seedDefaults(map[string]interface{}{
 		"slop::spin-add-count":  []int{3, 5, 10},
 		"slop::bias-factor-inc": 0.15,
+		"croc::words-level-1":   []string{},
+		"croc::words-level-2":   []string{},
+		"croc::words-level-3":   []string{},
+		"croc::words-level-4":   []string{},
+		"croc::words-level-5":   []string{},
 	})
 
 	mux := http.NewServeMux()
