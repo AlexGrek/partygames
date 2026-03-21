@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { RotateCcw, Square } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface MelodyItem {
@@ -14,7 +15,7 @@ type PlayPhase = "grace" | "playing" | "open-guess" | "stopping";
 // ── Constants ──────────────────────────────────────────────────────────────
 const GRACE_SECONDS = 3;
 const STOP_DELAY_MS = 3000;
-const VOLUME_FLASH_MS = 600;
+const VOLUME_FLASH_MS = 1000;
 const DEFAULT_FIRST_GUESS_DELAY = 15;
 const LS_GUESSED = "melody-guessed";
 
@@ -71,6 +72,25 @@ function flashVolume(audio: HTMLAudioElement) {
   requestAnimationFrame(tick);
 }
 
+// ── Animation variants ─────────────────────────────────────────────────────
+const screenVariants = {
+  initial: { opacity: 0, y: 24 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
+  exit:    { opacity: 0, y: -16, transition: { duration: 0.25, ease: "easeIn" as const } },
+};
+
+const fadeUp = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
+  exit:    { opacity: 0, y: -8, transition: { duration: 0.2 } },
+};
+
+const fadeIn = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.4 } },
+  exit:    { opacity: 0, transition: { duration: 0.2 } },
+};
+
 // ── Category Screen ────────────────────────────────────────────────────────
 function CategoryScreen({
   categories,
@@ -100,7 +120,14 @@ function CategoryScreen({
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-10 px-4 py-12">
+    <motion.div
+      key="category"
+      variants={screenVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="min-h-screen flex flex-col items-center justify-center gap-10 px-4 py-12"
+    >
       <div className="flex flex-col items-center gap-2">
         <span className="text-7xl">🎶</span>
         <h1
@@ -118,19 +145,22 @@ function CategoryScreen({
         </p>
       ) : (
         <div className="w-full max-w-sm flex flex-col gap-3">
-          {categories.map((cat) => {
+          {categories.map((cat, idx) => {
             const rem = remaining(cat);
             const tot = total(cat);
             const empty = rem === 0;
             return (
-              <button
+              <motion.button
                 key={cat}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0, transition: { delay: idx * 0.06, duration: 0.3 } }}
                 onClick={() => onPick(cat)}
                 disabled={empty}
-                className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl border transition-all ${
+                whileTap={empty ? undefined : { scale: 0.97 }}
+                className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl border transition-colors ${
                   empty
                     ? "opacity-35 cursor-not-allowed bg-white/3 border-white/8"
-                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 active:scale-[0.98]"
+                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
                 }`}
               >
                 <span className="text-lg font-semibold">{cat}</span>
@@ -141,42 +171,98 @@ function CategoryScreen({
                 >
                   {rem}/{tot}
                 </span>
-              </button>
+              </motion.button>
             );
           })}
         </div>
       )}
 
       <div className="flex flex-col items-center gap-2 mt-2">
-        {confirmReset ? (
-          <div className="flex gap-2 items-center flex-wrap justify-center">
-            <span className="text-sm text-neutral-400">Reset all progress?</span>
-            <button
-              onClick={() => {
-                clearGuessed();
-                onReset();
-                setConfirmReset(false);
-              }}
-              className="text-sm px-3 py-1 rounded-lg bg-red-800 hover:bg-red-700 text-white transition-colors"
+        <AnimatePresence mode="wait">
+          {confirmReset ? (
+            <motion.div
+              key="confirm"
+              variants={fadeUp}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="flex gap-2 items-center flex-wrap justify-center"
             >
-              Yes, reset
-            </button>
-            <button
-              onClick={() => setConfirmReset(false)}
-              className="text-sm px-3 py-1 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
+              <span className="text-sm text-neutral-400">Reset all progress?</span>
+              <button
+                onClick={() => {
+                  clearGuessed();
+                  onReset();
+                  setConfirmReset(false);
+                }}
+                className="text-sm px-3 py-1 rounded-lg bg-red-800 hover:bg-red-700 text-white transition-colors"
+              >
+                Yes, reset
+              </button>
+              <button
+                onClick={() => setConfirmReset(false)}
+                className="text-sm px-3 py-1 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
+              >
+                Cancel
+              </button>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="reset-btn"
+              variants={fadeIn}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              onClick={() => setConfirmReset(true)}
+              className="flex items-center gap-1.5 text-xs text-neutral-700 hover:text-neutral-400 transition-colors"
             >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="flex items-center gap-1.5 text-xs text-neutral-700 hover:text-neutral-400 transition-colors"
-          >
-            <RotateCcw size={12} />
-            Reset progress
-          </button>
-        )}
+              <RotateCcw size={12} />
+              Reset progress
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Progress Bar ───────────────────────────────────────────────────────────
+function ProgressBar({
+  firstGuessDelay,
+  active,
+  color,
+}: {
+  firstGuessDelay: number;
+  active: boolean; // true while "playing", false (width stays at 0) after
+  color: string;
+}) {
+  const [width, setWidth] = useState(100);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!active || startedRef.current) return;
+    // One rAF to let the 100% render first, then animate to 0
+    const id = requestAnimationFrame(() => {
+      startedRef.current = true;
+      setWidth(0);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [active]);
+
+  return (
+    <div className="w-full max-w-sm">
+      <div className="h-px bg-white/10 rounded-full overflow-visible relative">
+        <div
+          className="absolute top-0 left-0 h-full rounded-full"
+          style={{
+            width: `${width}%`,
+            backgroundColor: color,
+            boxShadow: `0 0 6px 2px ${color}`,
+            transition: active && !startedRef.current
+              ? "none"
+              : `width ${firstGuessDelay}s linear`,
+          }}
+        />
       </div>
     </div>
   );
@@ -278,9 +364,19 @@ function PlayScreen({
   const isOpenGuess = phase === "open-guess";
   const isStopping = phase === "stopping";
   const isGrace = phase === "grace";
+  const isPlaying = phase === "playing";
+
+  const accentColor = isOpenGuess || isStopping ? "#fbbf24" : "#c084fc";
 
   return (
-    <div className="relative min-h-screen">
+    <motion.div
+      key="play"
+      variants={screenVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="relative min-h-screen"
+    >
       {/* Amber overlay — fades in at open-guess */}
       <div
         className="fixed inset-0 pointer-events-none"
@@ -300,91 +396,140 @@ function PlayScreen({
         </span>
 
         {/* Grace period */}
-        {isGrace && (
-          <div className="flex flex-col items-center gap-4">
-            <span
-              className="text-[20vw] font-bold text-purple-300 tabular-nums leading-none select-none"
-              style={{
-                fontFamily: "'Syne', sans-serif",
-                textShadow: "0 0 40px rgba(168,85,247,0.6)",
-              }}
+        <AnimatePresence mode="wait">
+          {isGrace && (
+            <motion.div
+              key="grace"
+              variants={fadeIn}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="flex flex-col items-center gap-4"
             >
-              {graceCount}
-            </span>
-            <p className="text-neutral-400 text-lg">Get ready…</p>
-          </div>
-        )}
-
-        {/* Playing / open-guess / stopping */}
-        {!isGrace && (
-          <>
-            {/* Open-guess banner */}
-            {(isOpenGuess || isStopping) && (
-              <div
-                className="flex flex-col items-center gap-1"
-                style={{ animation: "fadeUp 0.4s ease forwards" }}
-              >
-                <span className="text-4xl">🎯</span>
-                <p className="text-yellow-300 font-bold text-xl tracking-wide">
-                  Everyone guesses!
-                </p>
-              </div>
-            )}
-
-            {/* Timer */}
-            <span
-              className="font-mono tabular-nums text-7xl font-bold leading-none select-none"
-              style={{
-                color: isOpenGuess || isStopping ? "#fbbf24" : "#c084fc",
-                textShadow:
-                  isOpenGuess || isStopping
-                    ? "0 0 32px rgba(251,191,36,0.55)"
-                    : "0 0 24px rgba(192,132,252,0.5)",
-              }}
-            >
-              {mm}:{ss}
-            </span>
-
-            {/* Song reveal (stopping only) */}
-            {isStopping && (
-              <div
-                className="flex flex-col items-center gap-2 py-6 px-10 rounded-3xl bg-white/5 border border-yellow-500/25 backdrop-blur-xl shadow-2xl"
-                style={{ animation: "fadeUp 0.4s ease forwards" }}
-              >
-                <span className="text-4xl">🎵</span>
-                <p
-                  className="text-2xl font-bold text-white text-center leading-tight"
-                  style={{ fontFamily: "'Syne', sans-serif" }}
-                >
-                  {song.title}
-                </p>
-                <p className="text-neutral-400 text-center">{song.artist}</p>
-                <p className="mt-3 text-neutral-500 text-sm tabular-nums">
-                  Back in {stoppingCount}…
-                </p>
-              </div>
-            )}
-
-            {/* Stop button */}
-            {!isStopping && (
-              <button
-                onClick={handleStop}
-                className="flex items-center gap-2 px-10 py-4 rounded-2xl font-semibold text-lg transition-all active:scale-95"
+              <motion.span
+                key={graceCount}
+                initial={{ scale: 1.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1, transition: { duration: 0.3 } }}
+                exit={{ scale: 0.7, opacity: 0, transition: { duration: 0.2 } }}
+                className="text-[20vw] font-bold text-purple-300 tabular-nums leading-none select-none"
                 style={{
-                  color: "#fca5a5",
-                  background: "rgba(239,68,68,0.15)",
-                  border: "1px solid rgba(239,68,68,0.45)",
-                  boxShadow: "0 0 24px rgba(239,68,68,0.2)",
+                  fontFamily: "'Syne', sans-serif",
+                  textShadow: "0 0 40px rgba(168,85,247,0.6)",
                 }}
               >
-                <Square size={20} fill="currentColor" />
-                Guessed!
-              </button>
-            )}
-          </>
-        )}
+                {graceCount}
+              </motion.span>
+              <p className="text-neutral-400 text-lg">Get ready…</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Playing / open-guess / stopping */}
+        <AnimatePresence>
+          {!isGrace && (
+            <motion.div
+              key="active"
+              variants={fadeIn}
+              initial="initial"
+              animate="animate"
+              className="flex flex-col items-center gap-8 w-full max-w-sm"
+            >
+              {/* Open-guess banner */}
+              <AnimatePresence>
+                {(isOpenGuess || isStopping) && (
+                  <motion.div
+                    key="banner"
+                    variants={fadeUp}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <span className="text-4xl">🎯</span>
+                    <p className="text-yellow-300 font-bold text-xl tracking-wide">
+                      Everyone guesses!
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Timer */}
+              <motion.span
+                className="font-mono tabular-nums text-7xl font-bold leading-none select-none"
+                animate={{
+                  color: accentColor,
+                  textShadow:
+                    isOpenGuess || isStopping
+                      ? "0 0 32px rgba(251,191,36,0.55)"
+                      : "0 0 24px rgba(192,132,252,0.5)",
+                }}
+                transition={{ duration: 0.6 }}
+              >
+                {mm}:{ss}
+              </motion.span>
+
+              {/* Progress bar — drains during playing phase */}
+              <ProgressBar
+                firstGuessDelay={firstGuessDelay}
+                active={isPlaying}
+                color={accentColor}
+              />
+
+              {/* Song reveal (stopping only) */}
+              <AnimatePresence>
+                {isStopping && (
+                  <motion.div
+                    key="reveal"
+                    variants={fadeUp}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="flex flex-col items-center gap-2 py-6 px-10 rounded-3xl bg-white/5 border border-yellow-500/25 backdrop-blur-xl shadow-2xl w-full"
+                  >
+                    <span className="text-4xl">🎵</span>
+                    <p
+                      className="text-2xl font-bold text-white text-center leading-tight"
+                      style={{ fontFamily: "'Syne', sans-serif" }}
+                    >
+                      {song.title}
+                    </p>
+                    <p className="text-neutral-400 text-center">{song.artist}</p>
+                    <p className="mt-3 text-neutral-500 text-sm tabular-nums">
+                      Back in {stoppingCount}…
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Stop button */}
+              <AnimatePresence>
+                {!isStopping && (
+                  <motion.button
+                    key="stop-btn"
+                    variants={fadeIn}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    onClick={handleStop}
+                    whileTap={{ scale: 0.94 }}
+                    className="flex items-center gap-2 px-10 py-4 rounded-2xl font-semibold text-lg transition-colors"
+                    style={{
+                      color: "#fca5a5",
+                      background: "rgba(239,68,68,0.15)",
+                      border: "1px solid rgba(239,68,68,0.45)",
+                      boxShadow: "0 0 24px rgba(239,68,68,0.2)",
+                    }}
+                  >
+                    <Square size={20} fill="currentColor" />
+                    Guessed!
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -444,24 +589,25 @@ export default function MelodyGame() {
     );
   }
 
-  if (currentSong) {
-    return (
-      <PlayScreen
-        key={currentSong.file}
-        song={currentSong}
-        firstGuessDelay={firstGuessDelay}
-        onDone={handleDone}
-      />
-    );
-  }
-
   return (
-    <CategoryScreen
-      categories={categories}
-      items={items}
-      refreshKey={refreshKey}
-      onPick={handlePickCategory}
-      onReset={handleReset}
-    />
+    <AnimatePresence mode="wait">
+      {currentSong ? (
+        <PlayScreen
+          key={currentSong.file}
+          song={currentSong}
+          firstGuessDelay={firstGuessDelay}
+          onDone={handleDone}
+        />
+      ) : (
+        <CategoryScreen
+          key="category-screen"
+          categories={categories}
+          items={items}
+          refreshKey={refreshKey}
+          onPick={handlePickCategory}
+          onReset={handleReset}
+        />
+      )}
+    </AnimatePresence>
   );
 }
