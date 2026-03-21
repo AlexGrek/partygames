@@ -14,7 +14,7 @@ type PlayPhase = "grace" | "playing" | "open-guess" | "stopping";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const GRACE_SECONDS = 3;
-const STOP_DELAY_MS = 3000;
+const STOP_DELAY_MS = 6000;
 const VOLUME_FLASH_MS = 1000;
 const DEFAULT_FIRST_GUESS_DELAY = 15;
 const LS_GUESSED = "melody-guessed";
@@ -285,7 +285,7 @@ function PlayScreen({
   const [phase, setPhase] = useState<PlayPhase>("grace");
   const [graceCount, setGraceCount] = useState(GRACE_SECONDS);
   const [elapsed, setElapsed] = useState(0);
-  const [stoppingCount, setStoppingCount] = useState(3);
+  const [stoppingCount, setStoppingCount] = useState(6);
   const audioRef = useRef<HTMLMediaElement | null>(null);
   const onDoneRef = useRef(onDone);
   useEffect(() => { onDoneRef.current = onDone; });
@@ -347,8 +347,8 @@ function PlayScreen({
   useEffect(() => {
     if (phase !== "stopping") return;
     audioRef.current?.pause();
-    setStoppingCount(3);
-    let count = 3;
+    setStoppingCount(6);
+    let count = 6;
     const id = setInterval(() => {
       count--;
       if (count <= 0) {
@@ -508,9 +508,17 @@ function PlayScreen({
                       {song.title}
                     </p>
                     <p className="text-neutral-400 text-center">{song.artist}</p>
-                    <p className="mt-3 text-neutral-500 text-sm tabular-nums">
-                      Back in {stoppingCount}…
-                    </p>
+                    <div className="mt-3 flex items-center gap-3">
+                      <p className="text-neutral-500 text-sm tabular-nums">
+                        Next in {stoppingCount}…
+                      </p>
+                      <button
+                        onClick={() => onDoneRef.current()}
+                        className="text-sm px-3 py-1 rounded-lg bg-white/8 hover:bg-white/15 text-neutral-300 transition-colors"
+                      >
+                        Next →
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
