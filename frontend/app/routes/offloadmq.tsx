@@ -8,7 +8,17 @@ type TaskStatus = "idle" | "running" | "done" | "error";
 
 interface TaskResult {
   status: string;
-  output: unknown;
+  result?: {
+    stdout?: string;
+    stderr?: string;
+    exit_code?: number;
+    return_code?: number;
+    // LLM
+    response?: string;
+    tokens_per_second?: number;
+    total_tokens?: number;
+    duration_ms?: number;
+  };
   log?: string;
 }
 
@@ -56,13 +66,35 @@ function OutputBox({
       </div>
     );
   }
+  const r = result?.result;
+  // Prefer structured fields; fall back to raw JSON
+  const hasText = r?.stdout != null || r?.response != null;
   return (
-    <div className="mt-3 rounded-lg bg-black/40 border border-white/10 px-4 py-3 text-sm font-mono whitespace-pre-wrap break-all text-green-300 max-h-64 overflow-y-auto">
-      {JSON.stringify(result?.output ?? result, null, 2)}
-      {result?.log && (
-        <div className="mt-2 border-t border-white/10 pt-2 text-neutral-400">
-          {result.log}
-        </div>
+    <div className="mt-3 rounded-lg bg-black/40 border border-white/10 px-4 py-3 text-sm font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto flex flex-col gap-2">
+      {hasText ? (
+        <>
+          {r?.stdout != null && (
+            <span className="text-green-300">{r.stdout || <em className="text-neutral-500 not-italic">empty stdout</em>}</span>
+          )}
+          {r?.stderr ? (
+            <span className="text-yellow-300">{r.stderr}</span>
+          ) : null}
+          {r?.response != null && (
+            <span className="text-green-300">{r.response}</span>
+          )}
+          {(r?.tokens_per_second != null || r?.duration_ms != null) && (
+            <span className="text-neutral-500 text-xs">
+              {r.total_tokens} tokens · {r.tokens_per_second?.toFixed(1)} tok/s · {r.duration_ms}ms
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="text-green-300">{JSON.stringify(r ?? result, null, 2)}</span>
+      )}
+      {(r?.exit_code != null || r?.return_code != null) && (
+        <span className="text-neutral-500 text-xs">
+          exit {r?.exit_code ?? r?.return_code}
+        </span>
       )}
     </div>
   );
