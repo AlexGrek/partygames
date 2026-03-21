@@ -418,6 +418,8 @@ func main() {
 		"croc::words-level-3":   []string{},
 		"croc::words-level-4":   []string{},
 		"croc::words-level-5":   []string{},
+		"croc::explain-capability": "llm.hf.co/INSAIT-Institute/MamayLM-Gemma-2-9B-IT-v0.1-GGUF:Q4_K_M",
+		"croc::explain-request":    `Поясни значення слова "{word}"`,
 		"melody::categories":        []string{},
 		"melody::items":             []interface{}{},
 		"melody::first-guess-delay": 15,

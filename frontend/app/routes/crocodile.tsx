@@ -50,11 +50,23 @@ async function fetchWords(level: number): Promise<string[]> {
   return Array.isArray(words) ? words : [];
 }
 
-const LLM_CAPABILITY = "llm.hf.co/INSAIT-Institute/MamayLM-Gemma-2-9B-IT-v0.1-GGUF:Q4_K_M";
+const DEFAULT_CAPABILITY = "llm.hf.co/INSAIT-Institute/MamayLM-Gemma-2-9B-IT-v0.1-GGUF:Q4_K_M";
+const DEFAULT_REQUEST = `Поясни значення слова "{word}"`;
 const OFFLOADMQ_API = "/api/v1/offloadmq";
 const DB_API = "/api/v1/keys";
 
 type ExplainStatus = "idle" | "loading" | "done" | "error";
+
+async function fetchStringKey(key: string, fallback: string): Promise<string> {
+  try {
+    const res = await fetch(`${DB_API}/${encodeURIComponent(key)}`);
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    return typeof data.value === "string" ? data.value : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function Crocodile() {
   const [allWords, setAllWords] = useState<Record<number, string[]>>({});
@@ -70,21 +82,30 @@ export default function Crocodile() {
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explainError, setExplainError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const explainConfigRef = useRef<{ capability: string; request: string } | null>(null);
 
   const timerStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     async function loadWords() {
-      const result: Record<number, string[]> = {};
-      for (let i = 1; i <= 5; i++) {
-        try {
-          const words = await fetchWords(i);
-          result[i] = words.length > 0 ? words : FALLBACK_WORDS[i];
-        } catch {
-          result[i] = FALLBACK_WORDS[i];
-        }
-      }
+      const [result, capability, request] = await Promise.all([
+        (async () => {
+          const r: Record<number, string[]> = {};
+          for (let i = 1; i <= 5; i++) {
+            try {
+              const words = await fetchWords(i);
+              r[i] = words.length > 0 ? words : FALLBACK_WORDS[i];
+            } catch {
+              r[i] = FALLBACK_WORDS[i];
+            }
+          }
+          return r;
+        })(),
+        fetchStringKey("croc::explain-capability", DEFAULT_CAPABILITY),
+        fetchStringKey("croc::explain-request", DEFAULT_REQUEST),
+      ]);
+      explainConfigRef.current = { capability, request };
       setAllWords(result);
       setLoading(false);
       pickWordFrom(2, result);
@@ -138,12 +159,14 @@ export default function Crocodile() {
       }
 
       // 2. Ask LLM via OffloadMQ
+      const cfg = explainConfigRef.current ?? { capability: DEFAULT_CAPABILITY, request: DEFAULT_REQUEST };
+      const prompt = cfg.request.replace("{word}", word);
       const res = await fetch(`${OFFLOADMQ_API}/api/task/submit_blocking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          capability: LLM_CAPABILITY,
-          payload: { prompt: `Поясни значення слова "${word}"` },
+          capability: cfg.capability,
+          payload: { prompt },
           urgent: true,
         }),
         signal: ctrl.signal,
@@ -217,7 +240,7 @@ export default function Crocodile() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <span className="text-neutral-400 text-xl">Загрузка...</span>
+        <span className="text-neutral-400 text-xl">Loading...</span>
       </div>
     );
   }
@@ -283,7 +306,7 @@ export default function Crocodile() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-neutral-400 hover:text-neutral-200 text-sm transition-all"
           >
             <BookOpen size={15} />
-            Пояснити слово
+            Explain word
           </button>
         )}
 
@@ -302,13 +325,13 @@ export default function Crocodile() {
                   animation: "spin 0.8s linear infinite",
                 }}
               />
-              Думаю…
+              Thinking…
               <button
                 onClick={cancelExplain}
                 className="ml-1 flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
               >
                 <X size={12} />
-                скасувати
+                cancel
               </button>
             </div>
             {/* shimmer placeholder lines */}
