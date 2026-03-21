@@ -6,7 +6,7 @@ export interface AppEntry {
 }
 
 export const APPS: AppEntry[] = [
-  { to: "/crocodile", label: "Crocodile", emoji: "🐊", category: "party" },
+  { to: "/crocodile", label: "Crocodildo 30+", emoji: "🐊", category: "party" },
   { to: "/slopmachine", label: "SlopMachine", emoji: "🎰", category: "party" },
   { to: "/melody", label: "Guess the Melody", emoji: "🎶", category: "party" },
   { to: "/db", label: "DB Viewer", emoji: "🗄️", category: "utils" },
