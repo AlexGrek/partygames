@@ -15,8 +15,8 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-lg bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
+      <div className="w-full max-w-lg bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <span className="font-semibold text-sm">{title}</span>
           <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors">
             <X size={16} />
@@ -75,7 +75,7 @@ function CreateModal({
             value={keyName}
             onChange={(e) => setKeyName(e.target.value)}
             placeholder="e.g. game:42"
-            className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-neutral-500 transition-colors"
+            className="bg-white/8 border border-white/15 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-neutral-500 transition-colors"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -85,15 +85,15 @@ function CreateModal({
             onChange={(e) => setJsonText(e.target.value)}
             rows={10}
             spellCheck={false}
-            className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-neutral-500 transition-colors resize-y"
+            className="bg-white/8 border border-white/15 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-neutral-500 transition-colors resize-y"
           />
         </div>
         {err && <p className="text-xs text-red-400">{err}</p>}
       </div>
-      <div className="flex justify-end gap-2 px-5 py-4 border-t border-neutral-800">
+      <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/10">
         <button
           onClick={onClose}
-          className="text-sm px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors"
+          className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
         >
           Cancel
         </button>
@@ -158,14 +158,14 @@ function EditModal({
           onChange={(e) => setJsonText(e.target.value)}
           rows={16}
           spellCheck={false}
-          className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-neutral-500 transition-colors resize-y"
+          className="bg-white/8 border border-white/15 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-neutral-500 transition-colors resize-y"
         />
         {err && <p className="text-xs text-red-400">{err}</p>}
       </div>
-      <div className="flex justify-end gap-2 px-5 py-4 border-t border-neutral-800">
+      <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/10">
         <button
           onClick={onClose}
-          className="text-sm px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors"
+          className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
         >
           Cancel
         </button>
@@ -218,10 +218,10 @@ function DeleteConfirm({
         </p>
         {err && <p className="text-xs text-red-400">{err}</p>}
       </div>
-      <div className="flex justify-end gap-2 px-5 py-4 border-t border-neutral-800">
+      <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/10">
         <button
           onClick={onClose}
-          className="text-sm px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors"
+          className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
         >
           Cancel
         </button>
@@ -327,13 +327,13 @@ export default function DbViewer() {
         />
       )}
 
-      <div className="min-h-screen flex flex-col">
-        <header className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between">
+      <div className="min-h-screen flex flex-col pt-12">
+        <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
           <h1 className="text-xl font-semibold tracking-tight">DB Editor</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={fetchKeys}
-              className="text-sm px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors"
+              className="text-sm px-3 py-1.5 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
             >
               Refresh
             </button>
@@ -349,8 +349,8 @@ export default function DbViewer() {
 
         <div className="flex flex-1 overflow-hidden">
           {/* Key list */}
-          <aside className="w-72 border-r border-neutral-800 flex flex-col overflow-hidden">
-            <div className="px-4 py-2 text-xs font-medium text-neutral-500 uppercase tracking-wider border-b border-neutral-800">
+          <aside className="w-72 border-r border-white/10 flex flex-col overflow-hidden">
+            <div className="px-4 py-2 text-xs font-medium text-neutral-500 uppercase tracking-wider border-b border-white/10">
               Keys {!loadingKeys && `(${keys.length})`}
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -366,7 +366,7 @@ export default function DbViewer() {
                     className={`w-full text-left px-4 py-2.5 text-sm font-mono truncate transition-colors ${
                       selectedKey === key
                         ? "bg-neutral-700 text-white"
-                        : "text-neutral-300 hover:bg-neutral-800"
+                        : "text-neutral-300 hover:bg-white/8"
                     }`}
                   >
                     {key}
@@ -380,7 +380,7 @@ export default function DbViewer() {
           <main className="flex-1 flex flex-col overflow-hidden">
             {selectedKey ? (
               <>
-                <div className="px-5 py-2 border-b border-neutral-800 flex items-center justify-between">
+                <div className="px-5 py-2 border-b border-white/10 flex items-center justify-between">
                   <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider font-mono">
                     {selectedKey}
                   </span>
@@ -389,7 +389,7 @@ export default function DbViewer() {
                       <button
                         onClick={() => setModal({ type: "edit", key: selectedKey, value })}
                         title="Edit value"
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-white/15 text-neutral-300 transition-colors"
                       >
                         <Pencil size={12} />
                         Edit
@@ -397,7 +397,7 @@ export default function DbViewer() {
                       <button
                         onClick={() => setModal({ type: "delete", key: selectedKey })}
                         title="Delete key"
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-red-900 text-neutral-300 hover:text-red-300 transition-colors"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-white/8 hover:bg-red-900 text-neutral-300 hover:text-red-300 transition-colors"
                       >
                         <Trash2 size={12} />
                         Delete

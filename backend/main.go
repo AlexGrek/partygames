@@ -253,6 +253,19 @@ func listFiles(w http.ResponseWriter, r *http.Request, dir string) {
 		return
 	}
 
+	subPath := r.URL.Query().Get("path")
+	if subPath != "" {
+		cleaned := filepath.Clean(subPath)
+		absRoot, _ := filepath.Abs(dir)
+		candidate := filepath.Join(absRoot, cleaned)
+		absCandidate, _ := filepath.Abs(candidate)
+		if absCandidate != absRoot && !strings.HasPrefix(absCandidate, absRoot+string(filepath.Separator)) {
+			errorResponse(w, http.StatusBadRequest, "invalid path")
+			return
+		}
+		dir = absCandidate
+	}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, err.Error())
