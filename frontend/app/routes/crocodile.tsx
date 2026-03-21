@@ -155,7 +155,7 @@ export default function Crocodile() {
             className="font-mono tabular-nums text-2xl font-bold"
             style={{ color, textShadow: `0 0 12px ${color}80` }}
           >
-            {elapsed}s
+            {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}
           </span>
         )}
       </div>
