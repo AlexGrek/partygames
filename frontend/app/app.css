@@ -33,6 +33,15 @@
   50%       { opacity: 0.4; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ── Liquid background blobs ─────────────────────────────────────────────── */
 
 .bg-blobs {

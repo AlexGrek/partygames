@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { TrendingDown, TrendingUp, RefreshCw, Shuffle } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { TrendingDown, TrendingUp, RefreshCw, Shuffle, BookOpen, X } from "lucide-react";
 
 const FALLBACK_WORDS: Record<number, string[]> = {
   1: ["кот", "дом"],
@@ -50,6 +50,12 @@ async function fetchWords(level: number): Promise<string[]> {
   return Array.isArray(words) ? words : [];
 }
 
+const LLM_CAPABILITY = "llm.hf.co/INSAIT-Institute/MamayLM-Gemma-2-9B-IT-v0.1-GGUF:Q4_K_M";
+const OFFLOADMQ_API = "/api/v1/offloadmq";
+const DB_API = "/api/v1/keys";
+
+type ExplainStatus = "idle" | "loading" | "done" | "error";
+
 export default function Crocodile() {
   const [allWords, setAllWords] = useState<Record<number, string[]>>({});
   const [currentWord, setCurrentWord] = useState<string>("");
@@ -59,6 +65,11 @@ export default function Crocodile() {
   const [wordKey, setWordKey] = useState(0);
   // elapsed seconds shown above the word (null = not started yet)
   const [elapsed, setElapsed] = useState<number | null>(null);
+
+  const [explainStatus, setExplainStatus] = useState<ExplainStatus>("idle");
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explainError, setExplainError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const timerStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -102,6 +113,74 @@ export default function Crocodile() {
     }, delay);
   }
 
+  const explainWord = useCallback(async (word: string) => {
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setExplainStatus("loading");
+    setExplanation(null);
+    setExplainError(null);
+
+    try {
+      // 1. Check cache in DB
+      const cacheKey = `croc::explanation::${word}`;
+      const cacheRes = await fetch(`${DB_API}/${encodeURIComponent(cacheKey)}`, {
+        signal: ctrl.signal,
+      });
+      if (cacheRes.ok) {
+        const cached = await cacheRes.json();
+        if (typeof cached.value === "string" && cached.value) {
+          setExplanation(cached.value);
+          setExplainStatus("done");
+          return;
+        }
+      }
+
+      // 2. Ask LLM via OffloadMQ
+      const res = await fetch(`${OFFLOADMQ_API}/api/task/submit_blocking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          capability: LLM_CAPABILITY,
+          payload: { prompt: `Поясни значення слова "${word}"` },
+          urgent: true,
+        }),
+        signal: ctrl.signal,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => `HTTP ${res.status}`);
+        throw new Error(text);
+      }
+
+      const data = await res.json();
+      const text: string = data?.result?.response ?? data?.result?.stdout ?? "";
+      if (!text) throw new Error("Empty response from LLM");
+
+      setExplanation(text);
+      setExplainStatus("done");
+
+      // 3. Cache result in DB
+      await fetch(`${DB_API}/${encodeURIComponent(cacheKey)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(text),
+      }).catch(() => {});
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setExplainError(String(e));
+      setExplainStatus("error");
+    }
+  }, []);
+
+  function cancelExplain() {
+    abortRef.current?.abort();
+    setExplainStatus("idle");
+    setExplanation(null);
+    setExplainError(null);
+  }
+
   function pickWordFrom(level: number, words: Record<number, string[]>) {
     const pool = words[level] ?? FALLBACK_WORDS[level];
     const used = getUsed(level);
@@ -113,6 +192,11 @@ export default function Crocodile() {
     setCurrentLevel(level);
     setWordKey((k) => k + 1);
     startTimerFor(word);
+    // Reset explanation for the new word
+    abortRef.current?.abort();
+    setExplainStatus("idle");
+    setExplanation(null);
+    setExplainError(null);
   }
 
   function pickWord(level: number) {
@@ -189,6 +273,80 @@ export default function Crocodile() {
             </span>
           ))}
         </span>
+      </div>
+
+      {/* Explain section */}
+      <div className="w-full max-w-sm flex flex-col items-center gap-3">
+        {explainStatus === "idle" && (
+          <button
+            onClick={() => explainWord(currentWord)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-neutral-400 hover:text-neutral-200 text-sm transition-all"
+          >
+            <BookOpen size={15} />
+            Пояснити слово
+          </button>
+        )}
+
+        {explainStatus === "loading" && (
+          <div className="w-full flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 text-neutral-500 text-sm">
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 16,
+                  height: 16,
+                  border: "2px solid",
+                  borderColor: `${color}40`,
+                  borderTopColor: color,
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite",
+                }}
+              />
+              Думаю…
+              <button
+                onClick={cancelExplain}
+                className="ml-1 flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
+              >
+                <X size={12} />
+                скасувати
+              </button>
+            </div>
+            {/* shimmer placeholder lines */}
+            <div className="w-full rounded-xl bg-white/4 border border-white/8 p-4 flex flex-col gap-2">
+              {[100, 85, 92, 60].map((w, i) => (
+                <div
+                  key={i}
+                  className="h-2.5 rounded-full"
+                  style={{
+                    width: `${w}%`,
+                    background: "linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%)",
+                    backgroundSize: "200% 100%",
+                    animation: `shimmer 1.5s ease-in-out infinite`,
+                    animationDelay: `${i * 0.15}s`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(explainStatus === "done" || explainStatus === "error") && (
+          <div className="w-full rounded-xl bg-white/4 border border-white/10 p-4 relative">
+            <button
+              onClick={cancelExplain}
+              className="absolute top-3 right-3 text-neutral-600 hover:text-neutral-400 transition-colors"
+            >
+              <X size={14} />
+            </button>
+            {explainStatus === "done" ? (
+              <p className="text-sm text-neutral-200 leading-relaxed pr-5 whitespace-pre-wrap">
+                {explanation}
+              </p>
+            ) : (
+              <p className="text-sm text-red-400">{explainError}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Progress bar */}
