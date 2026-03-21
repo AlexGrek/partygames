@@ -9,4 +9,5 @@ export default [
   route("croc-editor", "routes/croc-editor.tsx"),
   route("melody", "routes/melody.tsx"),
   route("melody-editor", "routes/melody-editor.tsx"),
+  route("offloadmq", "routes/offloadmq.tsx"),
 ] satisfies RouteConfig;

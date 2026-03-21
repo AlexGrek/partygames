@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -313,6 +317,56 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.fileServer.ServeHTTP(w, r)
 }
 
+// newOffloadMQProxy creates a reverse proxy to the OffloadMQ server that injects
+// the client API key into every request (X-API-Key header + JSON body "apiKey" field).
+func newOffloadMQProxy(serverURL, apiKey string) http.Handler {
+	target, err := url.Parse(serverURL)
+	if err != nil {
+		log.Fatalf("invalid offloadmq server URL: %v", err)
+	}
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = target.Scheme
+			req.URL.Host = target.Host
+			// Strip /api/v1/offloadmq prefix so the upstream sees its own paths.
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/api/v1/offloadmq")
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
+			req.Host = target.Host
+			req.Header.Set("X-API-Key", apiKey)
+			req.Header.Del("Origin")
+		},
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		// For JSON bodies, inject apiKey field so task endpoints get authenticated.
+		ct := r.Header.Get("Content-Type")
+		if strings.HasPrefix(ct, "application/json") && r.Body != nil {
+			bodyBytes, readErr := io.ReadAll(r.Body)
+			r.Body.Close()
+			if readErr == nil {
+				var body map[string]interface{}
+				if json.Unmarshal(bodyBytes, &body) == nil {
+					body["apiKey"] = apiKey
+					if merged, mergeErr := json.Marshal(body); mergeErr == nil {
+						bodyBytes = merged
+					}
+				}
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				r.ContentLength = int64(len(bodyBytes))
+			}
+		}
+		proxy.ServeHTTP(w, r)
+	})
+}
+
 // seedDefaults writes a key only if it does not already exist in the bucket.
 func seedDefaults(defaults map[string]interface{}) {
 	err := db.Update(func(tx *bolt.Tx) error {
@@ -344,7 +398,10 @@ func main() {
 	dbPath := flag.String("db", "data.db", "path to bbolt database file")
 	staticDir := flag.String("static", "", "directory to serve as frontend (optional)")
 	filesDir := flag.String("files", "", "directory to serve via WebDAV at /api/v1/files/ (optional)")
+	offloadMQURL := flag.String("offloadmq-url", "https://offloadmq.alexgr.space", "OffloadMQ server URL")
 	flag.Parse()
+
+	offloadMQKey := os.Getenv("OFFLOADMQ_API_KEY")
 
 	var err error
 	db, err = bolt.Open(*dbPath, 0600, nil)
@@ -369,6 +426,13 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/keys", handleKeys)
 	mux.HandleFunc("/api/v1/keys/", handleKeys)
+
+	if offloadMQKey != "" {
+		mux.Handle("/api/v1/offloadmq/", newOffloadMQProxy(*offloadMQURL, offloadMQKey))
+		log.Printf("OffloadMQ proxy enabled → %s", *offloadMQURL)
+	} else {
+		log.Printf("OFFLOADMQ_API_KEY not set — /api/v1/offloadmq/ disabled")
+	}
 
 	if *filesDir != "" {
 		if err := os.MkdirAll(*filesDir, 0755); err != nil {

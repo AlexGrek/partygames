@@ -18,4 +18,5 @@ export const APPS: AppEntry[] = [
     emoji: "✨",
     category: "utils",
   },
+  { to: "/offloadmq", label: "OffloadMQ", emoji: "⚡", category: "utils" },
 ];

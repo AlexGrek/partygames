@@ -26,6 +26,13 @@ spec:
         - -db={{ .Values.storage.mountPath }}/data.db
         - -static=./static
         - -files={{ .Values.filesStorage.mountPath }}
+        env:
+        - name: OFFLOADMQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: partygames-offloadmq
+              key: OFFLOADMQ_API_KEY
+              optional: true
         ports:
         - containerPort: {{ .Values.service.targetPort }}
         resources:
