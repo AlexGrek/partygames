@@ -78,15 +78,15 @@ function flashVolume(audio: HTMLAudioElement) {
 
 // ── Animation variants ─────────────────────────────────────────────────────
 const screenVariants = {
-  initial: { opacity: 0, y: 24 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
-  exit:    { opacity: 0, y: -16, transition: { duration: 0.25, ease: "easeIn" as const } },
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.3, ease: "easeOut" as const } },
+  exit:    { opacity: 0, transition: { duration: 0.2, ease: "easeIn" as const } },
 };
 
 const fadeUp = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
-  exit:    { opacity: 0, y: -8, transition: { duration: 0.2 } },
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
+  exit:    { opacity: 0, y: -4, transition: { duration: 0.2 } },
 };
 
 const fadeIn = {
@@ -489,9 +489,9 @@ function PlayScreen({
                 </AnimatePresence>
               </div>
 
-              {/* Song reveal (stopping only) */}
-              <AnimatePresence>
-                {isStopping && (
+              {/* Reveal card ↔ Stop button — swap without layout shift */}
+              <AnimatePresence mode="wait">
+                {isStopping ? (
                   <motion.div
                     key="reveal"
                     variants={fadeUp}
@@ -520,12 +520,7 @@ function PlayScreen({
                       </button>
                     </div>
                   </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Stop button */}
-              <AnimatePresence>
-                {!isStopping && (
+                ) : (
                   <motion.button
                     key="stop-btn"
                     variants={fadeIn}
