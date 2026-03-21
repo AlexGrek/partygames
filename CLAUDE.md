@@ -106,31 +106,6 @@ args:
 - The image is always built for `linux/amd64` via `docker buildx --platform linux/amd64`.
 - The Go binary is compiled with `CGO_ENABLED=0` for a fully static binary compatible with `alpine`.
 
-## Frontend Role
-
-### Design language
-- **Liquid glass aesthetic** — translucent surfaces with backdrop blur, subtle borders, layered depth. Think frosted glass over a dark gradient, not flat cards.
-- **Dark theme only** — non-negotiable, never add light mode toggles or theme customization.
-- **Typography** — use expressive, custom Google Fonts (e.g. display fonts for headings, mono for data). Never rely on system defaults for anything visible.
-- **Emojis and icons** — use lucide-react icons for actions/status, emojis for personality and visual anchors. Both should feel intentional, not decorative noise.
-
-### Code quality
-- **Readability first** — short, named components with obvious responsibilities. If a JSX block exceeds ~40 lines, extract it.
-- **Maximum reuse** — build components generic enough to move between apps. No one-off wrappers; if something is used twice it becomes a shared component.
-- **No inline style soup** — all visual work goes through Tailwind classes. Custom CSS only for things Tailwind cannot express (keyframes, complex clip-paths, etc.).
-- **Custom animations via CSS/Tailwind** — prefer `@keyframes` in a CSS file or Tailwind's `animate-*` utilities. Use framer-motion only when gesture or physics behaviour is genuinely needed, not just for fades.
-
-### Responsive strategy
-- **Mobile-first by default** — start with `sm:` base, scale up. Touch targets ≥ 44px, no hover-only interactions.
-- **Exceptions — large screen only** — `SlopMachine` and service/admin screens are desktop-only. No need to make them responsive; a "best viewed on desktop" note is fine.
-
-### Checklist before shipping UI
-- [ ] Works and looks good on 375px wide (iPhone SE)
-- [ ] No layout shift on load (reserve space for async content)
-- [ ] Fonts loaded via `<link rel="preconnect">` + `font-display: swap`
-- [ ] Interactive elements have visible focus states
-- [ ] No hardcoded colors — everything through Tailwind design tokens
-
 ## DevOps Role
 
 ### Goals
