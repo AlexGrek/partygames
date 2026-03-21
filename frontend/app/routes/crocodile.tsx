@@ -148,16 +148,20 @@ export default function Crocodile() {
         reset
       </button>
 
-      {/* Timer — appears after 3s post-reveal, sits above the word */}
+      {/* Timer — breathes at 00:00 during grace period, then counts up */}
       <div className="h-8 flex items-center justify-center">
-        {elapsed !== null && (
-          <span
-            className="font-mono tabular-nums text-2xl font-bold"
-            style={{ color, textShadow: `0 0 12px ${color}80` }}
-          >
-            {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}
-          </span>
-        )}
+        <span
+          className="font-mono tabular-nums text-2xl font-bold"
+          style={{
+            color,
+            textShadow: elapsed !== null ? `0 0 12px ${color}80` : undefined,
+            animation: elapsed === null ? "breathe 1s ease-in-out infinite" : undefined,
+          }}
+        >
+          {elapsed === null
+            ? "00:00"
+            : `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`}
+        </span>
       </div>
 
       {/* Word — letters revealed one-by-one via CSS animation */}

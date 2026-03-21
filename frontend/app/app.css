@@ -21,6 +21,11 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes breathe {
+  0%, 100% { opacity: 0.8; }
+  50%       { opacity: 0.4; }
+}
+
 /* ── Liquid background blobs ─────────────────────────────────────────────── */
 
 .bg-blobs {
