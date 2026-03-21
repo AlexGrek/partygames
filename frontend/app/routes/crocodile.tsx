@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TrendingDown, TrendingUp, RefreshCw, Shuffle } from "lucide-react";
 
 const FALLBACK_WORDS: Record<number, string[]> = {
@@ -18,6 +18,8 @@ const LEVEL_COLORS: Record<number, string> = {
 };
 
 const LS_PREFIX = "croc-used-";
+const LETTER_DELAY = 0.07; // seconds between each letter reveal
+const TIMER_START_DELAY = 3000; // ms after last letter before timer starts
 
 function getUsed(level: number): Set<string> {
   try {
@@ -53,6 +55,13 @@ export default function Crocodile() {
   const [currentWord, setCurrentWord] = useState<string>("");
   const [currentLevel, setCurrentLevel] = useState<number>(3);
   const [loading, setLoading] = useState(true);
+  // key increments on each new word to reset CSS animations
+  const [wordKey, setWordKey] = useState(0);
+  // elapsed seconds shown above the word (null = not started yet)
+  const [elapsed, setElapsed] = useState<number | null>(null);
+
+  const timerStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     async function loadWords() {
@@ -70,7 +79,28 @@ export default function Crocodile() {
       pickWordFrom(3, result);
     }
     loadWords();
+    return () => {
+      clearTimeout(timerStartRef.current!);
+      clearInterval(intervalRef.current!);
+    };
   }, []);
+
+  function startTimerFor(word: string) {
+    clearTimeout(timerStartRef.current!);
+    clearInterval(intervalRef.current!);
+    setElapsed(null);
+
+    const revealDuration = word.length * LETTER_DELAY * 1000;
+    const delay = revealDuration + TIMER_START_DELAY;
+
+    timerStartRef.current = setTimeout(() => {
+      const startTime = Date.now();
+      setElapsed(0);
+      intervalRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    }, delay);
+  }
 
   function pickWordFrom(level: number, words: Record<number, string[]>) {
     const pool = words[level] ?? FALLBACK_WORDS[level];
@@ -81,6 +111,8 @@ export default function Crocodile() {
     markUsed(level, word);
     setCurrentWord(word);
     setCurrentLevel(level);
+    setWordKey((k) => k + 1);
+    startTimerFor(word);
   }
 
   function pickWord(level: number) {
@@ -94,11 +126,6 @@ export default function Crocodile() {
 
   const color = LEVEL_COLORS[currentLevel];
   const fillPercent = (currentLevel / 5) * 100;
-
-  // Font size that guarantees the word fits any screen:
-  // Russo One chars are ~0.6× wide as tall.
-  // We want charCount * 0.6 * fontSize ≤ 90vw  →  fontSize ≤ 150vw / charCount
-  // Also cap at 25vh so the word doesn't overflow vertically.
   const charCount = currentWord.length || 1;
   const dynVw = Math.floor(140 / charCount);
   const wordFontSize = `min(${dynVw}vw, 25vh)`;
@@ -121,18 +148,42 @@ export default function Crocodile() {
         reset
       </button>
 
-      {/* Word — always fits the screen */}
-      <div className="w-full text-center px-2">
+      {/* Timer — appears after 3s post-reveal, sits above the word */}
+      <div className="h-8 flex items-center justify-center">
+        {elapsed !== null && (
+          <span
+            className="font-mono tabular-nums text-2xl font-bold"
+            style={{ color, textShadow: `0 0 12px ${color}80` }}
+          >
+            {elapsed}s
+          </span>
+        )}
+      </div>
+
+      {/* Word — letters revealed one-by-one via CSS animation */}
+      <div className="w-full text-center px-2" key={wordKey}>
         <span
-          className="select-none leading-none block"
+          className="select-none leading-none"
           style={{
             fontFamily: "'Russo One', sans-serif",
             fontSize: wordFontSize,
-            color: "#ffffff",
             whiteSpace: "nowrap",
+            display: "inline-block",
           }}
         >
-          {currentWord}
+          {currentWord.split("").map((char, i) => (
+            <span
+              key={i}
+              style={{
+                display: "inline-block",
+                opacity: 0,
+                animation: `letterReveal 0.3s ease forwards`,
+                animationDelay: `${i * LETTER_DELAY}s`,
+              }}
+            >
+              {char}
+            </span>
+          ))}
         </span>
       </div>
 
@@ -152,7 +203,6 @@ export default function Crocodile() {
 
       {/* 2×2 button grid */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-        {/* Easier */}
         <button
           onClick={() => pickWord(currentLevel - 1)}
           disabled={currentLevel <= 1}
@@ -162,7 +212,6 @@ export default function Crocodile() {
           <span className="text-sm font-medium">Easier next</span>
         </button>
 
-        {/* Harder */}
         <button
           onClick={() => pickWord(currentLevel + 1)}
           disabled={currentLevel >= 5}
@@ -172,7 +221,6 @@ export default function Crocodile() {
           <span className="text-sm font-medium">Harder next</span>
         </button>
 
-        {/* Same */}
         <button
           onClick={() => pickWord(currentLevel)}
           className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border text-sm font-medium transition-all"
@@ -187,7 +235,6 @@ export default function Crocodile() {
           <span className="text-sm font-medium">Same next</span>
         </button>
 
-        {/* Random */}
         <button
           onClick={() => pickWord(Math.ceil(Math.random() * 5))}
           className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border border-purple-500 text-purple-400 transition-all"

@@ -14,6 +14,13 @@
   }
 }
 
+/* ── Crocodile letter reveal ─────────────────────────────────────────────── */
+
+@keyframes letterReveal {
+  from { opacity: 0; transform: translateY(0.15em); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Liquid background blobs ─────────────────────────────────────────────── */
 
 .bg-blobs {
