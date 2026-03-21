@@ -69,15 +69,22 @@ async function deleteAudioFile(filePath: string): Promise<void> {
 }
 
 // ── AudioPreview ───────────────────────────────────────────────────────────
+function isVideoFile(file: string): boolean {
+  return /\.(mp4|webm|mov|m4v|mkv|avi)$/i.test(file);
+}
+
 function AudioPreview({ filePath }: { filePath: string }) {
   const [playing, setPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLMediaElement | null>(null);
 
   function toggle() {
     if (!audioRef.current) {
-      const audio = new Audio(`${FILES_BASE}/${filePath}`);
-      audioRef.current = audio;
-      audio.onended = () => setPlaying(false);
+      const media: HTMLMediaElement = isVideoFile(filePath)
+        ? Object.assign(document.createElement("video"), { playsInline: true })
+        : new Audio();
+      media.src = `${FILES_BASE}/${filePath}`;
+      audioRef.current = media;
+      media.onended = () => setPlaying(false);
     }
     if (playing) {
       audioRef.current.pause();
@@ -292,7 +299,7 @@ function AddSongForm({
         <input
           ref={fileInputRef}
           type="file"
-          accept="audio/*"
+          accept="audio/*,video/*"
           className="hidden"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />

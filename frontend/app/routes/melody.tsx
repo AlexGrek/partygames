@@ -45,6 +45,10 @@ function fileUrl(file: string): string {
   return `/api/v1/files/${path}`;
 }
 
+function isVideoFile(file: string): boolean {
+  return /\.(mp4|webm|mov|m4v|mkv|avi)$/i.test(file);
+}
+
 function pickRandom(pool: MelodyItem[]): MelodyItem | null {
   if (pool.length === 0) return null;
   const guessed = getGuessed();
@@ -282,20 +286,23 @@ function PlayScreen({
   const [graceCount, setGraceCount] = useState(GRACE_SECONDS);
   const [elapsed, setElapsed] = useState(0);
   const [stoppingCount, setStoppingCount] = useState(3);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLMediaElement | null>(null);
   const onDoneRef = useRef(onDone);
   useEffect(() => { onDoneRef.current = onDone; });
 
-  // Create audio and start preloading during grace period
+  // Create media element and start preloading during grace period
   useEffect(() => {
-    const audio = new Audio(fileUrl(song.file));
-    audio.volume = 1;
-    audio.preload = "auto";
-    audio.load();
-    audioRef.current = audio;
+    const media: HTMLMediaElement = isVideoFile(song.file)
+      ? Object.assign(document.createElement("video"), { playsInline: true })
+      : new Audio();
+    media.src = fileUrl(song.file);
+    media.volume = 1;
+    media.preload = "auto";
+    media.load();
+    audioRef.current = media;
     return () => {
-      audio.pause();
-      audio.src = "";
+      media.pause();
+      media.src = "";
       audioRef.current = null;
     };
   }, [song.file]);
