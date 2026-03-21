@@ -449,39 +449,38 @@ function PlayScreen({
                 {mm}:{ss}
               </motion.span>
 
-              {/* Progress bar → "Everyone guesses!" crossfade */}
-              <AnimatePresence mode="wait">
-                {isPlaying ? (
-                  <motion.div
-                    key="progress"
-                    variants={fadeIn}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="w-full"
-                  >
-                    <ProgressBar
-                      firstGuessDelay={firstGuessDelay}
-                      active={isPlaying}
-                      color={accentColor}
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="banner"
-                    variants={fadeUp}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="flex flex-col items-center gap-1"
-                  >
-                    <span className="text-4xl">🎯</span>
-                    <p className="text-yellow-300 font-bold text-xl tracking-wide">
+              {/* Progress bar → "Everyone guesses!" crossfade — fixed height to prevent layout shift */}
+              <div className="w-full flex items-center justify-center h-5">
+                <AnimatePresence mode="wait">
+                  {isPlaying ? (
+                    <motion.div
+                      key="progress"
+                      variants={fadeIn}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      className="w-full"
+                    >
+                      <ProgressBar
+                        firstGuessDelay={firstGuessDelay}
+                        active={isPlaying}
+                        color={accentColor}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.p
+                      key="banner"
+                      variants={fadeUp}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      className="text-yellow-300 font-bold text-sm tracking-widest uppercase"
+                    >
                       Everyone guesses!
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Song reveal (stopping only) */}
               <AnimatePresence>
