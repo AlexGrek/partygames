@@ -535,7 +535,7 @@ const SlotMachine = () => {
           </p>
         )}
 
-        {outOfSpins && (
+        {endStateActive && (
           <div className="add-spins-zone">
             {jackpot
               ? <h2 className="victory-text">🎊 JACKPOT! 🎊</h2>
