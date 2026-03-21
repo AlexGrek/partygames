@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
-import { Save, ToggleLeft, ToggleRight, X, MoveRight, Loader } from "lucide-react";
+import { Save, ToggleLeft, ToggleRight, X, MoveRight, Loader, Wand2, ShieldCheck } from "lucide-react";
 
 const LEVELS = [1, 2, 3, 4, 5] as const;
 type Level = (typeof LEVELS)[number];
+type ActiveTab = Level | "checkup";
 
 const LEVEL_LABELS: Record<Level, string> = {
   1: "Easy",
@@ -63,6 +64,15 @@ function clean(words: string[]): string[] {
 function isYamlValid(text: string): boolean {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   return lines.length === 0 || lines.every((l) => l.startsWith("- "));
+}
+
+function needsCapFix(word: string): boolean {
+  if (!word) return false;
+  return !/^\p{Lu}/u.test(word);
+}
+
+function capitalize(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 // ── Move dropdown ─────────────────────────────────────────────────────────────
@@ -137,7 +147,6 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
     const [newWord, setNewWord] = useState("");
     const newWordRef = useRef<HTMLInputElement>(null);
 
-    // Always-current getter, safe to call from parent ref
     const getterRef = useRef<() => string[]>(() => initialWords);
     getterRef.current = () => (altMode ? parseYaml(yaml) : clean(words));
 
@@ -194,13 +203,10 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
       });
     }
 
-    const wordCount = effectiveWords.length;
-
     return (
       <div className="flex flex-col gap-5">
-        {/* Toolbar */}
         <div className="flex items-center justify-between">
-          <span className="text-base text-neutral-400">{wordCount} words</span>
+          <span className="text-base text-neutral-400">{effectiveWords.length} words</span>
           <div className="flex items-center gap-3">
             <button
               onClick={toggleMode}
@@ -225,7 +231,6 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
           </div>
         </div>
 
-        {/* Content */}
         {altMode ? (
           <textarea
             value={yaml}
@@ -284,6 +289,124 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
   }
 );
 
+// ── Checkup panel ─────────────────────────────────────────────────────────────
+
+function CheckupPanel({ dbWords, onRemoveFromLevel, onAutoFix }: {
+  dbWords: AllWords;
+  onRemoveFromLevel: (word: string, level: Level) => Promise<void>;
+  onAutoFix: () => Promise<void>;
+}) {
+  const [fixing, setFixing] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  // Duplicates: word → levels it appears in
+  const wordToLevels: Record<string, Level[]> = {};
+  for (const level of LEVELS) {
+    for (const word of dbWords[level]) {
+      if (!wordToLevels[word]) wordToLevels[word] = [];
+      wordToLevels[word].push(level);
+    }
+  }
+  const duplicates = Object.entries(wordToLevels)
+    .filter(([, levels]) => levels.length >= 2)
+    .map(([word, levels]) => ({ word, levels: levels as Level[] }))
+    .sort((a, b) => a.word.localeCompare(b.word));
+
+  // Capitalization issues
+  const capIssues: { word: string; level: Level; fixed: string }[] = [];
+  for (const level of LEVELS) {
+    for (const word of dbWords[level]) {
+      if (needsCapFix(word)) capIssues.push({ word, level, fixed: capitalize(word) });
+    }
+  }
+
+  async function handleRemove(word: string, level: Level) {
+    setRemoving(`${word}-${level}`);
+    try { await onRemoveFromLevel(word, level); } finally { setRemoving(null); }
+  }
+
+  async function handleAutoFix() {
+    setFixing(true);
+    try { await onAutoFix(); } finally { setFixing(false); }
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Duplicates */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-3">Duplicates</h2>
+        {duplicates.length === 0 ? (
+          <p className="text-sm text-green-500 flex items-center gap-2"><ShieldCheck size={15} /> No duplicates found</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {duplicates.map(({ word, levels }) => (
+              <div key={word} className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-xl px-4 py-2.5">
+                <span className="text-base text-neutral-200 flex-1 font-medium">{word}</span>
+                <div className="flex gap-1.5 flex-wrap justify-end">
+                  {levels.map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => handleRemove(word, level)}
+                      disabled={removing === `${word}-${level}`}
+                      title={`Remove from ${LEVEL_LABELS[level]}`}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all hover:brightness-125 disabled:opacity-30"
+                      style={{
+                        background: `${LEVEL_COLORS[level]}20`,
+                        color: LEVEL_COLORS[level],
+                        border: `1px solid ${LEVEL_COLORS[level]}40`,
+                      }}
+                    >
+                      {removing === `${word}-${level}`
+                        ? <Loader size={11} className="animate-spin" />
+                        : <X size={11} />}
+                      {LEVEL_LABELS[level]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Capitalization */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">Capitalization</h2>
+          {capIssues.length > 0 && (
+            <button
+              onClick={handleAutoFix}
+              disabled={fixing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 bg-white/5 text-neutral-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
+            >
+              {fixing ? <Loader size={12} className="animate-spin" /> : <Wand2 size={12} />}
+              Auto fix all
+            </button>
+          )}
+        </div>
+        {capIssues.length === 0 ? (
+          <p className="text-sm text-green-500 flex items-center gap-2"><ShieldCheck size={15} /> All words start with a capital letter</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {capIssues.map(({ word, level, fixed }, i) => (
+              <div key={i} className="flex items-center gap-3 bg-white/5 border border-white/8 rounded-xl px-4 py-2.5">
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0"
+                  style={{ background: `${LEVEL_COLORS[level]}20`, color: LEVEL_COLORS[level] }}
+                >
+                  {LEVEL_LABELS[level]}
+                </span>
+                <span className="text-base text-neutral-500 line-through flex-1">{word}</span>
+                <span className="text-base text-neutral-200">→ {fixed}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
 function Toast({ message, detail }: { message: string; detail: string }) {
@@ -301,7 +424,7 @@ type AllWords = Record<Level, string[]>;
 
 export default function CrocEditor() {
   const [dbWords, setDbWords] = useState<AllWords>({ 1: [], 2: [], 3: [], 4: [], 5: [] });
-  const [activeLevel, setActiveLevel] = useState<Level>(1);
+  const [activeTab, setActiveTab] = useState<ActiveTab>(1);
   const [loading, setLoading] = useState(true);
   const [autoSaving, setAutoSaving] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -335,9 +458,10 @@ export default function CrocEditor() {
   }
 
   async function handleSave(words: string[]) {
+    if (activeTab === "checkup") return;
     setSaveState("saving");
     try {
-      await commitSave(activeLevel, words);
+      await commitSave(activeTab, words);
       setSaveState("ok");
     } catch (err) {
       setSaveState("err");
@@ -348,9 +472,10 @@ export default function CrocEditor() {
   }
 
   async function handleAddWord(words: string[]) {
+    if (activeTab === "checkup") return;
     setSaveState("saving");
     try {
-      await commitSave(activeLevel, words);
+      await commitSave(activeTab, words);
       setSaveState("ok");
     } catch (err) {
       setSaveState("err");
@@ -360,22 +485,25 @@ export default function CrocEditor() {
     }
   }
 
-  async function handleTabSwitch(newLevel: Level) {
-    if (newLevel === activeLevel) return;
-    const words = editorRef.current?.getEffectiveWords() ?? [];
-    const dirty = JSON.stringify(words) !== JSON.stringify(dbWords[activeLevel]);
-    if (dirty) {
-      setAutoSaving(true);
-      try {
-        await commitSave(activeLevel, words);
-      } catch (err) {
-        showToast(`Changes to "${LEVEL_LABELS[activeLevel]}" lost`, err);
-      } finally {
-        setAutoSaving(false);
+  async function handleTabSwitch(newTab: ActiveTab) {
+    if (newTab === activeTab) return;
+    // Auto-save current level editor before leaving (if it's a level tab)
+    if (activeTab !== "checkup" && editorRef.current) {
+      const words = editorRef.current.getEffectiveWords();
+      const dirty = JSON.stringify(words) !== JSON.stringify(dbWords[activeTab]);
+      if (dirty) {
+        setAutoSaving(true);
+        try {
+          await commitSave(activeTab, words);
+        } catch (err) {
+          showToast(`Changes to "${LEVEL_LABELS[activeTab]}" lost`, err);
+        } finally {
+          setAutoSaving(false);
+        }
       }
     }
     setSaveState("idle");
-    setActiveLevel(newLevel);
+    setActiveTab(newTab);
   }
 
   async function handleMove(word: string, fromLevel: Level, toLevel: Level) {
@@ -392,6 +520,32 @@ export default function CrocEditor() {
     } finally {
       setMovingWord(null);
     }
+  }
+
+  async function handleRemoveFromLevel(word: string, level: Level) {
+    const words = dbWords[level].filter((w) => w !== word);
+    try {
+      await commitSave(level, words);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      showToast("Remove failed", err);
+    }
+  }
+
+  async function handleAutoFix() {
+    for (const level of LEVELS) {
+      const words = dbWords[level];
+      const fixed = words.map((w) => needsCapFix(w) ? capitalize(w) : w);
+      if (JSON.stringify(fixed) !== JSON.stringify(words)) {
+        try {
+          await commitSave(level, fixed);
+        } catch (err) {
+          showToast(`Failed to fix ${LEVEL_LABELS[level]}`, err);
+          return;
+        }
+      }
+    }
+    setRefreshKey((k) => k + 1);
   }
 
   if (loading) {
@@ -416,39 +570,57 @@ export default function CrocEditor() {
       {/* Tabs */}
       <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/5 border border-white/8">
         {LEVELS.map((level) => {
-          const active = level === activeLevel;
+          const active = level === activeTab;
           const c = LEVEL_COLORS[level];
           return (
             <button
               key={level}
               onClick={() => handleTabSwitch(level)}
               className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-xs font-semibold transition-all"
-              style={
-                active
-                  ? { background: `${c}20`, color: c, boxShadow: `0 0 12px ${c}30` }
-                  : { color: "#6b7280" }
-              }
+              style={active ? { background: `${c}20`, color: c, boxShadow: `0 0 12px ${c}30` } : { color: "#6b7280" }}
             >
               <span>{LEVEL_LABELS[level]}</span>
               <span className="text-[10px] font-normal opacity-70">{dbWords[level].length}w</span>
             </button>
           );
         })}
+        {/* Checkup tab */}
+        <button
+          onClick={() => handleTabSwitch("checkup")}
+          className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-lg text-xs font-semibold transition-all"
+          style={
+            activeTab === "checkup"
+              ? { background: "rgba(99,102,241,0.15)", color: "#818cf8", boxShadow: "0 0 12px rgba(99,102,241,0.2)" }
+              : { color: "#6b7280" }
+          }
+        >
+          <ShieldCheck size={14} />
+          <span>Checkup</span>
+        </button>
       </div>
 
-      {/* Active editor — remounts on tab switch */}
+      {/* Content */}
       <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
-        <LevelEditor
-          key={`${activeLevel}-${refreshKey}`}
-          ref={editorRef}
-          level={activeLevel}
-          initialWords={dbWords[activeLevel]}
-          saveState={saveState}
-          movingWord={movingWord}
-          onSave={handleSave}
-          onAddWord={handleAddWord}
-          onMove={(word, toLevel) => handleMove(word, activeLevel, toLevel)}
-        />
+        {activeTab === "checkup" ? (
+          <CheckupPanel
+            key={refreshKey}
+            dbWords={dbWords}
+            onRemoveFromLevel={handleRemoveFromLevel}
+            onAutoFix={handleAutoFix}
+          />
+        ) : (
+          <LevelEditor
+            key={`${activeTab}-${refreshKey}`}
+            ref={editorRef}
+            level={activeTab}
+            initialWords={dbWords[activeTab]}
+            saveState={saveState}
+            movingWord={movingWord}
+            onSave={handleSave}
+            onAddWord={handleAddWord}
+            onMove={(word, toLevel) => handleMove(word, activeTab, toLevel)}
+          />
+        )}
       </div>
 
       {toast && <Toast message={toast.message} detail={toast.detail} />}
