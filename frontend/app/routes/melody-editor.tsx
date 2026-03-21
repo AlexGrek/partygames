@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Plus, Trash2, Play, Pause, Upload, Loader, Music, ListMusic, X,
+  Plus, Trash2, Play, Pause, Upload, Loader, Music, ListMusic, X, FolderInput,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -68,6 +68,17 @@ async function deleteAudioFile(filePath: string): Promise<void> {
   await fetch(`${FILES_BASE}/${segments.join("/")}`, { method: "DELETE" });
 }
 
+// ── Filename parsing ───────────────────────────────────────────────────────
+function guessFromFilename(filename: string): { title: string; artist: string } {
+  let name = filename.replace(/\.[^.]+$/, "");        // strip extension
+  name = name.replace(/\s*\[[^\]]+\]\s*$/, "").trim(); // strip [youtube-id]
+  const idx = name.indexOf(" - ");
+  if (idx !== -1) {
+    return { artist: name.slice(0, idx).trim(), title: name.slice(idx + 3).trim() };
+  }
+  return { title: name, artist: "" };
+}
+
 // ── AudioPreview ───────────────────────────────────────────────────────────
 function isVideoFile(file: string): boolean {
   return /\.(mp4|webm|mov|m4v|mkv|avi)$/i.test(file);
@@ -116,10 +127,12 @@ function AudioPreview({ filePath }: { filePath: string }) {
 // ── SongRow ────────────────────────────────────────────────────────────────
 function SongRow({
   item,
+  categories,
   onUpdate,
   onDelete,
 }: {
   item: MelodyItem;
+  categories: string[];
   onUpdate: (updated: MelodyItem) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
@@ -128,6 +141,19 @@ function SongRow({
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [moving, setMoving] = useState(false);
+
+  async function handleMove(newCategory: string) {
+    if (!newCategory || moving) return;
+    setMoving(true);
+    try {
+      await onUpdate({ ...item, category: newCategory });
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  const otherCategories = categories.filter((c) => c !== item.category);
 
   const titleDirty = editTitle.trim() !== item.title;
   const artistDirty = editArtist.trim() !== item.artist;
@@ -174,7 +200,26 @@ function SongRow({
         />
       </div>
 
-      {saving && <Loader size={13} className="text-neutral-600 animate-spin shrink-0" />}
+      {(saving || moving) && <Loader size={13} className="text-neutral-600 animate-spin shrink-0" />}
+
+      {/* Move to category */}
+      {otherCategories.length > 0 && (
+        <div className="relative shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <select
+            value=""
+            onChange={(e) => { handleMove(e.target.value); e.target.value = ""; }}
+            disabled={moving || saving}
+            title="Move to another category"
+            className="text-xs bg-neutral-900 border border-white/10 rounded-lg pl-2 pr-6 py-1 text-neutral-400 hover:text-white hover:border-white/25 cursor-pointer appearance-none outline-none transition-colors disabled:opacity-50"
+          >
+            <option value="" disabled>Move to…</option>
+            {otherCategories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <FolderInput size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-600" />
+        </div>
+      )}
 
       {/* Filename badge */}
       <span
@@ -301,7 +346,15 @@ function AddSongForm({
           type="file"
           accept="audio/*,video/*"
           className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            setFile(f);
+            if (f) {
+              const guess = guessFromFilename(f.name);
+              if (!title.trim()) setTitle(guess.title);
+              if (!artist.trim()) setArtist(guess.artist);
+            }
+          }}
         />
 
         <button
@@ -329,12 +382,14 @@ function AddSongForm({
 // ── CategoryTab ────────────────────────────────────────────────────────────
 function CategoryTab({
   category,
+  categories,
   items,
   onAdd,
   onUpdate,
   onDelete,
 }: {
   category: string;
+  categories: string[];
   items: MelodyItem[];
   onAdd: (item: MelodyItem) => Promise<void>;
   onUpdate: (old: MelodyItem, updated: MelodyItem) => Promise<void>;
@@ -349,6 +404,7 @@ function CategoryTab({
           <SongRow
             key={item.file}
             item={item}
+            categories={categories}
             onUpdate={(updated) => onUpdate(item, updated)}
             onDelete={() => onDelete(item)}
           />
@@ -601,6 +657,7 @@ export default function MelodyEditor() {
           <CategoryTab
             key={activeTab}
             category={activeTab}
+            categories={categories}
             items={categoryItems}
             onAdd={handleAddSong}
             onUpdate={handleUpdateSong}
