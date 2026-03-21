@@ -1,0 +1,309 @@
+.machine-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #121212;
+  color: #ffffff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  position: relative;
+}
+
+.bias-indicator {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  color: #ffffff;
+  opacity: 0.15;
+  pointer-events: none;
+  user-select: none;
+}
+
+.title {
+  font-size: 3rem;
+  letter-spacing: 5px;
+  color: #00ffcc;
+  text-shadow: 0 0 10px #00ffcc, 0 0 20px #00ffcc;
+  margin-bottom: 2rem;
+}
+
+.slot-row {
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  background: #1e1e1e;
+  border: 4px solid #333;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.slot-card {
+  width: 100px;
+  height: 120px;
+  background: #2a2a2a;
+  border-radius: 10px;
+  border: 2px solid #444;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Top/bottom fade for depth */
+.slot-card::before,
+.slot-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 36px;
+  z-index: 2;
+  pointer-events: none;
+}
+.slot-card::before {
+  top: 0;
+  background: linear-gradient(to bottom, #2a2a2a, transparent);
+}
+.slot-card::after {
+  bottom: 0;
+  background: linear-gradient(to top, #2a2a2a, transparent);
+}
+
+.slot-reel {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.slot-item {
+  height: 120px;
+  min-height: 120px;
+  width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+}
+
+.spin-button {
+  margin-top: 2rem;
+  padding: 15px 40px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  background: transparent;
+  color: #ff00ff;
+  border: 3px solid #ff00ff;
+  border-radius: 50px;
+  text-transform: uppercase;
+  transition: 0.3s;
+  box-shadow: 0 0 10px #ff00ff;
+}
+
+.spin-button:hover:not(:disabled) {
+  background: #ff00ff;
+  color: #fff;
+  box-shadow: 0 0 30px #ff00ff;
+}
+
+.spin-button.disabled {
+  border-color: #555;
+  color: #555;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.message-zone {
+  min-height: 60px;
+  margin-top: 3.5rem;
+}
+
+.victory-text {
+  color: #ffff00;
+  text-shadow: 0 0 10px #ffff00;
+  animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.hint {
+  color: #666;
+  font-style: italic;
+}
+
+.free-spin-text {
+  color: #ffe600;
+  text-shadow: 0 0 12px #ffe600, 0 0 30px #ff8800;
+  animation: free-spin-pop 2.2s ease-out forwards;
+}
+
+@keyframes free-spin-pop {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-6deg); }
+  15%  { opacity: 1; transform: scale(1.25) rotate(3deg); }
+  30%  { transform: scale(0.95) rotate(-1deg); }
+  45%  { transform: scale(1.08) rotate(1deg); }
+  60%  { transform: scale(1) rotate(0deg); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.9); }
+}
+
+.spin-count {
+  color: #888;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+}
+
+.add-spins-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.out-of-spins-text {
+  color: #ff4444;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.add-spins-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.add-spins-button {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  background: transparent;
+  color: #00ffcc;
+  border: 2px solid #00ffcc;
+  border-radius: 50px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 0 8px #00ffcc55;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s ease, transform 0.4s ease, background 0.2s, box-shadow 0.2s;
+}
+
+.add-spins-button.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.add-spins-button:hover {
+  background: #00ffcc;
+  color: #121212;
+  box-shadow: 0 0 20px #00ffcc;
+}
+
+/* ── Shake animations ────────────────────────── */
+
+.shake-light {
+  animation: shake-light 0.38s ease-in-out;
+}
+
+@keyframes shake-light {
+  0%,100% { transform: translateX(0); }
+  18%      { transform: translateX(-5px); }
+  36%      { transform: translateX(5px); }
+  54%      { transform: translateX(-4px); }
+  72%      { transform: translateX(4px); }
+  88%      { transform: translateX(-2px); }
+}
+
+.shake-heavy {
+  animation: shake-heavy 0.65s ease-in-out;
+}
+
+@keyframes shake-heavy {
+  0%,100% { transform: translateX(0)    translateY(0); }
+  10%      { transform: translateX(-12px) translateY(-4px); }
+  20%      { transform: translateX(12px)  translateY(4px); }
+  30%      { transform: translateX(-14px) translateY(-3px); }
+  40%      { transform: translateX(14px)  translateY(5px); }
+  50%      { transform: translateX(-10px) translateY(-5px); }
+  60%      { transform: translateX(10px)  translateY(3px); }
+  70%      { transform: translateX(-7px)  translateY(-2px); }
+  80%      { transform: translateX(7px)   translateY(2px); }
+  90%      { transform: translateX(-3px)  translateY(-1px); }
+}
+
+/* ── Victory overlay ─────────────────────────── */
+
+.victory-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.victory-particle {
+  position: absolute;
+  font-size: var(--size);
+  line-height: 1;
+  user-select: none;
+}
+
+/* 1 — Confetti rain from the top */
+.victory-anim-1 .victory-particle {
+  left: var(--x);
+  top: -3rem;
+  animation: v-fall var(--dur) var(--delay) ease-in both;
+}
+
+@keyframes v-fall {
+  0%   { transform: translateY(0)      rotate(0deg);        opacity: 1; }
+  85%  {                                                     opacity: 1; }
+  100% { transform: translateY(108vh)  rotate(var(--rot));  opacity: 0; }
+}
+
+/* 2 — Radial burst from center */
+.victory-anim-2 .victory-particle {
+  left: 50%;
+  top: 50%;
+  animation: v-burst var(--dur) var(--delay) ease-out both;
+}
+
+@keyframes v-burst {
+  0%   { transform: translate(-50%, -50%) scale(0);                                             opacity: 0; }
+  18%  { transform: translate(-50%, -50%) scale(1.5);                                           opacity: 1; }
+  72%  {                                                                                         opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.5);       opacity: 0; }
+}
+
+/* 3 — Rising bubbles from the bottom */
+.victory-anim-3 .victory-particle {
+  left: var(--x);
+  bottom: -3rem;
+  animation: v-rise var(--dur) var(--delay) ease-out both;
+}
+
+@keyframes v-rise {
+  0%   { transform: translateY(0)       translateX(0)            rotate(0deg);        opacity: 1; }
+  85%  {                                                                               opacity: 1; }
+  100% { transform: translateY(-108vh)  translateX(var(--sway))  rotate(var(--rot));  opacity: 0; }
+}
+
+/* 4 — Pop-in scatter: particles materialise at random screen positions */
+.victory-anim-4 .victory-particle {
+  left: var(--x);
+  top:  var(--y);
+  animation: v-pop var(--dur) var(--delay) ease-out both;
+}
+
+@keyframes v-pop {
+  0%   { transform: scale(0)    rotate(0deg);                    opacity: 0; }
+  22%  { transform: scale(1.7)  rotate(calc(var(--rot) * 0.15)); opacity: 1; }
+  65%  {                                                          opacity: 1; }
+  100% { transform: scale(0.2)  rotate(var(--rot));              opacity: 0; }
+}

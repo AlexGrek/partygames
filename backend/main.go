@@ -313,6 +313,32 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.fileServer.ServeHTTP(w, r)
 }
 
+// seedDefaults writes a key only if it does not already exist in the bucket.
+func seedDefaults(defaults map[string]interface{}) {
+	err := db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(bucket)
+		if err != nil {
+			return err
+		}
+		for k, v := range defaults {
+			if b.Get([]byte(k)) != nil {
+				continue // already set, leave it alone
+			}
+			raw, err := json.Marshal(v)
+			if err != nil {
+				return err
+			}
+			if err := b.Put([]byte(k), raw); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Fatalf("failed to seed defaults: %v", err)
+	}
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "data.db", "path to bbolt database file")
@@ -326,6 +352,11 @@ func main() {
 		log.Fatalf("failed to open database: %v", err)
 	}
 	defer db.Close()
+
+	seedDefaults(map[string]interface{}{
+		"slop::spin-add-count":  []int{3, 5, 10},
+		"slop::bias-factor-inc": 0.15,
+	})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/keys", handleKeys)

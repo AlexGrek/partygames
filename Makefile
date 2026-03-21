@@ -4,6 +4,9 @@ IMAGE  := grekodocker/partygames:$(COMMIT)
 .PHONY: dev build-frontend build-backend run-backend docker-push helm-upgrade deploy
 
 dev:
+	@pkill -f 'go run ./backend' 2>/dev/null || true
+	@pkill -f 'backend/server' 2>/dev/null || true
+	go run ./backend/main.go -addr :8080 -db data.db &
 	cd frontend && npm run dev
 
 build-frontend:
