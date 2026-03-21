@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Chart.Name }}-backend
+  labels:
+    app: {{ .Chart.Name }}-backend
+spec:
+  serviceName: {{ .Chart.Name }}-backend-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}-backend
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}-backend
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+      - name: backend
+        image: {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        args:
+        - -addr=:{{ .Values.backend.service.targetPort }}
+        - -db={{ .Values.backend.storage.mountPath }}/data.db
+        ports:
+        - containerPort: {{ .Values.backend.service.targetPort }}
+        resources:
+          limits:
+            cpu: {{ .Values.backend.resources.limits.cpu }}
+            memory: {{ .Values.backend.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.backend.resources.requests.cpu }}
+            memory: {{ .Values.backend.resources.requests.memory }}
+        volumeMounts:
+        - name: backend-storage
+          mountPath: {{ .Values.backend.storage.mountPath }}
+  volumeClaimTemplates:
+  - metadata:
+      name: backend-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      {{- if .Values.backend.storage.storageClass }}
+      storageClassName: {{ .Values.backend.storage.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.backend.storage.size }}
+
+---
+# Headless service required by StatefulSet for stable pod DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}-backend-headless
+spec:
+  selector:
+    app: {{ .Chart.Name }}-backend
+  clusterIP: None
+  ports:
+  - port: {{ .Values.backend.service.targetPort }}
+    targetPort: {{ .Values.backend.service.targetPort }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}-backend
+spec:
+  selector:
+    app: {{ .Chart.Name }}-backend
+  ports:
+  - port: {{ .Values.backend.service.port }}
+    targetPort: {{ .Values.backend.service.targetPort }}
+  type: {{ .Values.backend.service.type }}
