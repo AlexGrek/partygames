@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Save, ToggleLeft, ToggleRight, X, ArrowRight, Loader } from "lucide-react";
+import { Save, ToggleLeft, ToggleRight, X, MoveRight, Loader } from "lucide-react";
 
 const LEVELS = [1, 2, 3, 4, 5] as const;
 type Level = (typeof LEVELS)[number];
@@ -57,6 +57,64 @@ function clean(words: string[]): string[] {
   return words.map((w) => w.trim()).filter(Boolean);
 }
 
+// ── Move dropdown ─────────────────────────────────────────────────────────────
+
+function MoveDropdown({
+  word,
+  fromLevel,
+  moving,
+  onMove,
+}: {
+  word: string;
+  fromLevel: Level;
+  moving: boolean;
+  onMove: (toLevel: Level) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={moving}
+        title="Move to category"
+        className="w-7 h-7 flex items-center justify-center rounded-lg text-neutral-600 hover:text-neutral-300 hover:bg-white/10 transition-all disabled:opacity-30"
+      >
+        <MoveRight size={15} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 flex flex-col gap-0.5 p-1 rounded-xl bg-black/80 border border-white/10 shadow-2xl backdrop-blur-xl min-w-[110px]">
+          {LEVELS.filter((l) => l !== fromLevel).map((toLevel) => (
+            <button
+              key={toLevel}
+              onClick={() => { setOpen(false); onMove(toLevel); }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10 text-left"
+              style={{ color: LEVEL_COLORS[toLevel] }}
+            >
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ background: LEVEL_COLORS[toLevel] }}
+              />
+              {LEVEL_LABELS[toLevel]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Level editor ─────────────────────────────────────────────────────────────
 
 interface LevelEditorProps {
@@ -70,19 +128,19 @@ interface LevelEditorProps {
   onYamlChange: (yaml: string) => void;
   onAltModeToggle: () => void;
   onSave: () => void;
+  onAddWord: (word: string) => void;
   onMove: (word: string, toLevel: Level) => Promise<void>;
 }
 
 function LevelEditor({
   level, words, altMode, yamlText, saveState, movingWord,
-  onWordsChange, onYamlChange, onAltModeToggle, onSave, onMove,
+  onWordsChange, onYamlChange, onAltModeToggle, onSave, onAddWord, onMove,
 }: LevelEditorProps) {
   const color = LEVEL_COLORS[level];
   const [newWord, setNewWord] = useState("");
   const newWordRef = useRef<HTMLInputElement>(null);
   const wordCount = altMode ? parseYaml(yamlText).length : clean(words).length;
 
-  // Focus new-word input whenever switching to form mode
   useEffect(() => {
     if (!altMode) newWordRef.current?.focus();
   }, [altMode]);
@@ -94,15 +152,12 @@ function LevelEditor({
   function pushNewWord() {
     const w = newWord.trim();
     if (!w) return;
-    onWordsChange([...words, w]);
     setNewWord("");
+    onAddWord(w); // auto-saves
   }
 
   function handleNewWordKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      pushNewWord();
-    }
+    if (e.key === "Enter") { e.preventDefault(); pushNewWord(); }
   }
 
   function handleYamlKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -111,9 +166,7 @@ function LevelEditor({
     const el = e.currentTarget;
     const { selectionStart, selectionEnd, value } = el;
     const insert = "\n- ";
-    const next = value.slice(0, selectionStart) + insert + value.slice(selectionEnd);
-    onYamlChange(next);
-    // restore cursor after the inserted prefix
+    onYamlChange(value.slice(0, selectionStart) + insert + value.slice(selectionEnd));
     requestAnimationFrame(() => {
       el.selectionStart = el.selectionEnd = selectionStart + insert.length;
     });
@@ -169,26 +222,12 @@ function LevelEditor({
                 onChange={(e) => setWord(i, e.target.value)}
                 className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-base text-neutral-200 focus:outline-none focus:border-white/25 transition-colors"
               />
-              {/* Move to level */}
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowRight size={13} className="text-neutral-600 shrink-0" />
-                {LEVELS.filter((l) => l !== level).map((toLevel) => (
-                  <button
-                    key={toLevel}
-                    onClick={() => onMove(word.trim(), toLevel)}
-                    disabled={!word.trim() || movingWord === word}
-                    title={`Move to ${LEVEL_LABELS[toLevel]}`}
-                    className="w-6 h-6 rounded text-xs font-bold flex items-center justify-center transition-all disabled:opacity-30"
-                    style={{
-                      background: `${LEVEL_COLORS[toLevel]}25`,
-                      color: LEVEL_COLORS[toLevel],
-                      border: `1px solid ${LEVEL_COLORS[toLevel]}50`,
-                    }}
-                  >
-                    {movingWord === word ? "…" : toLevel}
-                  </button>
-                ))}
-              </div>
+              <MoveDropdown
+                word={word}
+                fromLevel={level}
+                moving={movingWord === word}
+                onMove={(toLevel) => onMove(word.trim(), toLevel)}
+              />
               <button
                 onClick={() => onWordsChange(words.filter((_, j) => j !== i))}
                 className="text-neutral-700 hover:text-neutral-300 transition-colors shrink-0"
@@ -210,7 +249,8 @@ function LevelEditor({
               className="flex-1 bg-black/20 border border-dashed border-white/15 rounded-lg px-3 py-2 text-base text-neutral-300 placeholder-neutral-600 focus:outline-none focus:border-white/30 transition-colors"
               placeholder="новое слово… (Enter)"
             />
-            <div className="w-6 shrink-0" /> {/* spacer to align with delete buttons above */}
+            {/* spacer to align with move+delete buttons */}
+            <div className="w-[60px] shrink-0" />
           </div>
         </div>
       )}
@@ -263,18 +303,33 @@ export default function CrocEditor() {
     return JSON.stringify(getEffectiveWords(level)) !== JSON.stringify(dbWords[level]);
   }
 
-  async function commitSave(level: Level): Promise<void> {
-    const words = getEffectiveWords(level);
-    await apiSave(level, words);
-    setDbWords((prev) => ({ ...prev, [level]: words }));
-    setLocalWords((prev) => ({ ...prev, [level]: words }));
-    setYamlText((prev) => ({ ...prev, [level]: toYaml(words) }));
+  async function commitSave(level: Level, words?: string[]): Promise<void> {
+    const w = words ?? getEffectiveWords(level);
+    await apiSave(level, w);
+    setDbWords((prev) => ({ ...prev, [level]: w }));
+    setLocalWords((prev) => ({ ...prev, [level]: w }));
+    setYamlText((prev) => ({ ...prev, [level]: toYaml(w) }));
   }
 
   async function handleSave(level: Level) {
     setSaveState(level, "saving");
     try {
       await commitSave(level);
+      setSaveState(level, "ok");
+    } catch {
+      setSaveState(level, "err");
+    } finally {
+      setTimeout(() => setSaveState(level, "idle"), 1800);
+    }
+  }
+
+  // Add word + auto-save atomically
+  async function handleAddWord(level: Level, word: string) {
+    const next = [...clean(localWords[level]), word];
+    setLocalWords((prev) => ({ ...prev, [level]: next }));
+    setSaveState(level, "saving");
+    try {
+      await commitSave(level, next);
       setSaveState(level, "ok");
     } catch {
       setSaveState(level, "err");
@@ -385,6 +440,7 @@ export default function CrocEditor() {
           onYamlChange={(y) => setYamlText((prev) => ({ ...prev, [activeLevel]: y }))}
           onAltModeToggle={() => handleAltModeToggle(activeLevel)}
           onSave={() => handleSave(activeLevel)}
+          onAddWord={(word) => handleAddWord(activeLevel, word)}
           onMove={(word, toLevel) => handleMove(word, activeLevel, toLevel)}
         />
       </div>
