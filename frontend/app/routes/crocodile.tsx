@@ -253,8 +253,8 @@ export default function Crocodile() {
   const color = LEVEL_COLORS[currentLevel];
   const fillPercent = (currentLevel / 5) * 100;
   const charCount = currentWord.length || 1;
-  const dynVw = Math.floor(140 / charCount);
-  const wordFontSize = `min(${dynVw}vw, 25vh)`;
+  const dynVw = Math.floor(110 / charCount);
+  const wordFontSize = `min(${dynVw}vw, 18vh)`;
 
   if (loading) {
     return (
@@ -311,7 +311,7 @@ export default function Crocodile() {
                 animationDelay: `${i * LETTER_DELAY}s`,
               }}
             >
-              {char}
+              {char === " " ? "\u00A0" : char}
             </span>
           ))}
         </span>
