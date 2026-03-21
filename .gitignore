@@ -11,3 +11,4 @@ frontend/.react-router/
 # OS
 .DS_Store
 itest/.venv/
+.venv-yt/
