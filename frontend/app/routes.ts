@@ -8,4 +8,5 @@ export default [
   route("files", "routes/files.tsx"),
   route("croc-editor", "routes/croc-editor.tsx"),
   route("melody", "routes/melody.tsx"),
+  route("melody-editor", "routes/melody-editor.tsx"),
 ] satisfies RouteConfig;
