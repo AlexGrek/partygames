@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	bolt "go.etcd.io/bbolt"
+	"golang.org/x/net/webdav"
 )
 
 var (
@@ -212,6 +214,72 @@ func deleteValue(w http.ResponseWriter, r *http.Request, key string) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"key": key, "deleted": true})
 }
 
+// corsWebDAV wraps a handler with CORS headers suitable for WebDAV clients and browsers.
+func corsWebDAV(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, PROPFIND, MKCOL, COPY, MOVE, OPTIONS, HEAD")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Depth, Destination, Overwrite, Authorization")
+		w.Header().Set("Access-Control-Expose-Headers", "DAV, Content-Length, ETag")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// listFiles returns a JSON directory listing of the root of the files storage.
+//
+// GET /api/v1/files
+//
+// Response 200:
+//
+//	{ "files": [{ "name": "foo.txt", "size": 1234, "isDir": false, "modTime": "..." }] }
+func listFiles(w http.ResponseWriter, r *http.Request, dir string) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		errorResponse(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type FileEntry struct {
+		Name    string `json:"name"`
+		Size    int64  `json:"size"`
+		IsDir   bool   `json:"isDir"`
+		ModTime string `json:"modTime"`
+	}
+
+	files := []FileEntry{}
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		files = append(files, FileEntry{
+			Name:    entry.Name(),
+			Size:    info.Size(),
+			IsDir:   entry.IsDir(),
+			ModTime: info.ModTime().UTC().Format(time.RFC3339),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"files": files})
+}
+
 // spaHandler serves static files and falls back to index.html for unknown paths,
 // enabling client-side routing in the SPA.
 type spaHandler struct {
@@ -232,6 +300,7 @@ func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "data.db", "path to bbolt database file")
 	staticDir := flag.String("static", "", "directory to serve as frontend (optional)")
+	filesDir := flag.String("files", "", "directory to serve via WebDAV at /api/v1/files/ (optional)")
 	flag.Parse()
 
 	var err error
@@ -244,6 +313,22 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/keys", handleKeys)
 	mux.HandleFunc("/api/v1/keys/", handleKeys)
+
+	if *filesDir != "" {
+		if err := os.MkdirAll(*filesDir, 0755); err != nil {
+			log.Fatalf("failed to create files directory: %v", err)
+		}
+		davHandler := &webdav.Handler{
+			Prefix:     "/api/v1/files/",
+			FileSystem: webdav.Dir(*filesDir),
+			LockSystem: webdav.NewMemLS(),
+		}
+		mux.Handle("/api/v1/files/", corsWebDAV(davHandler))
+		mux.HandleFunc("/api/v1/files", func(w http.ResponseWriter, r *http.Request) {
+			listFiles(w, r, *filesDir)
+		})
+		log.Printf("serving files via WebDAV from %s at /api/v1/files/", *filesDir)
+	}
 
 	if *staticDir != "" {
 		mux.Handle("/", spaHandler{

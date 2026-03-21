@@ -29,6 +29,14 @@ export default function Home() {
           <span className="text-7xl group-hover:scale-110 transition-transform">🗄️</span>
           <span className="text-2xl font-semibold">DB Viewer</span>
         </Link>
+
+        <Link
+          to="/files"
+          className="flex flex-col items-center gap-4 px-12 py-10 rounded-2xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-600 transition-all group"
+        >
+          <span className="text-7xl group-hover:scale-110 transition-transform">📁</span>
+          <span className="text-2xl font-semibold">Files</span>
+        </Link>
       </div>
     </div>
   );

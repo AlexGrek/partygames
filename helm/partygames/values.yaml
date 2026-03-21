@@ -21,6 +21,11 @@ storage:
   # storageClass: ""  # leave unset to use the cluster default StorageClass
   size: 1Gi
 
+filesStorage:
+  mountPath: /files
+  # storageClass: ""  # leave unset to use the cluster default StorageClass
+  size: 5Gi
+
 terminationGracePeriodSeconds: 2
 
 ingress:

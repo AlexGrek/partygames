@@ -25,6 +25,7 @@ spec:
         - -addr=:{{ .Values.service.targetPort }}
         - -db={{ .Values.storage.mountPath }}/data.db
         - -static=./static
+        - -files={{ .Values.filesStorage.mountPath }}
         ports:
         - containerPort: {{ .Values.service.targetPort }}
         resources:
@@ -37,6 +38,8 @@ spec:
         volumeMounts:
         - name: data
           mountPath: {{ .Values.storage.mountPath }}
+        - name: files
+          mountPath: {{ .Values.filesStorage.mountPath }}
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -48,6 +51,16 @@ spec:
       resources:
         requests:
           storage: {{ .Values.storage.size }}
+  - metadata:
+      name: files
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      {{- if .Values.filesStorage.storageClass }}
+      storageClassName: {{ .Values.filesStorage.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.filesStorage.size }}
 
 ---
 # Headless service required by StatefulSet for stable pod DNS
