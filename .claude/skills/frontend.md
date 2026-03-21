@@ -1,3 +1,9 @@
+---
+name: frontend
+description: Frontend standards and design language for Party Games. Use when writing, reviewing, or planning any React/TypeScript/Tailwind frontend code in this project.
+user-invocable: true
+---
+
 # Frontend Skill — Party Games
 
 ## Stack
