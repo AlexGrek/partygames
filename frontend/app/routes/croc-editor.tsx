@@ -37,7 +37,10 @@ async function apiSave(level: Level, words: string[]): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(words),
   });
-  if (!res.ok) throw new Error("save failed");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status} ${res.statusText}${body ? `\n${body}` : ""}`);
+  }
 }
 
 function parseYaml(text: string): string[] {
