@@ -267,10 +267,11 @@ const LevelEditor = forwardRef<LevelEditorHandle, LevelEditorProps>(
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-function Toast({ message }: { message: string }) {
+function Toast({ message, detail }: { message: string; detail: string }) {
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl bg-red-950/90 border border-red-500/40 text-red-300 text-sm shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-      {message}
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl bg-red-950/90 border border-red-500/40 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-sm w-full">
+      <p className="text-red-300 text-sm font-medium">{message}</p>
+      <p className="text-red-500/80 text-xs mt-1 font-mono leading-snug whitespace-pre-wrap">{detail}</p>
     </div>
   );
 }
@@ -286,12 +287,13 @@ export default function CrocEditor() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [movingWord, setMovingWord] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; detail: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
   const editorRef = useRef<LevelEditorHandle>(null);
 
-  function showToast(msg: string) {
-    setToast(msg);
+  function showToast(message: string, err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    setToast({ message, detail });
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3500);
   }
@@ -329,9 +331,9 @@ export default function CrocEditor() {
     try {
       await commitSave(activeLevel, words);
       setSaveState("ok");
-    } catch {
+    } catch (err) {
       setSaveState("err");
-      showToast("Failed to save — check your connection");
+      showToast("Failed to save", err);
     } finally {
       setTimeout(() => setSaveState("idle"), 1800);
     }
@@ -345,8 +347,8 @@ export default function CrocEditor() {
       setAutoSaving(true);
       try {
         await commitSave(activeLevel, words);
-      } catch {
-        showToast(`Changes to "${LEVEL_LABELS[activeLevel]}" couldn't be saved — lost`);
+      } catch (err) {
+        showToast(`Changes to "${LEVEL_LABELS[activeLevel]}" lost`, err);
       } finally {
         setAutoSaving(false);
       }
@@ -363,8 +365,8 @@ export default function CrocEditor() {
       const toNext = toWords.includes(word) ? toWords : [...toWords, word];
       await Promise.all([apiSave(fromLevel, fromWords), apiSave(toLevel, toNext)]);
       await refreshAll();
-    } catch {
-      showToast("Move failed — check your connection");
+    } catch (err) {
+      showToast("Move failed", err);
     } finally {
       setMovingWord(null);
     }
@@ -429,7 +431,7 @@ export default function CrocEditor() {
         />
       </div>
 
-      {toast && <Toast message={toast} />}
+      {toast && <Toast message={toast.message} detail={toast.detail} />}
     </div>
   );
 }
