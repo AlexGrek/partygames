@@ -714,6 +714,7 @@ export default function MelodyEditor() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<string[]>([]);
   const [items, setItems] = useState<MelodyItem[]>([]);
+  const itemsRef = useRef<MelodyItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>("__categories__");
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -728,6 +729,7 @@ export default function MelodyEditor() {
     Promise.all([loadCategories(), loadItems()]).then(([cats, its]) => {
       setCategories(cats);
       setItems(its);
+      itemsRef.current = its;
       setLoading(false);
     });
     return () => clearTimeout(toastTimer.current);
@@ -741,9 +743,10 @@ export default function MelodyEditor() {
   }
 
   async function handleAddSong(item: MelodyItem) {
-    const next = [...items, item];
+    const next = [...itemsRef.current, item];
     try {
       await saveItems(next);
+      itemsRef.current = next;
       setItems(next);
     } catch (e) {
       showError(e instanceof Error ? e.message : String(e));
