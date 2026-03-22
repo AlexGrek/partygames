@@ -244,6 +244,8 @@ const SlotMachine = () => {
   // endStateActive gates pack-swap + button reveal; delayed for jackpot
   const [endStateActive, setEndStateActive] = useState(false);
   const victoryPlayingRef = useRef(false);
+  const jackpotRef = useRef(false);
+  const winAudioRef = useRef(null);
   const [spins, setSpins] = useState(INITIAL_SPINS);
   const [addCounts, setAddCounts] = useState(DEFAULT_ADD_COUNTS);
   const biasRef = useRef(0);
@@ -325,6 +327,21 @@ const SlotMachine = () => {
     doStep();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (winAudioRef.current) {
+        winAudioRef.current.pause();
+        winAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playWinSound = useCallback(() => {
+    const audio = new Audio("/api/v1/files/slop/win.mp3");
+    audio.play().catch((e) => console.warn("[slop] win sound not found:", e));
+    winAudioRef.current = audio;
+  }, []);
+
   const playSpinSound = useCallback(() => {
     const audio = new Audio("/api/v1/files/slop/spin.mp3");
     audio.play().catch((e) => console.warn("[slop] spin sound not found:", e));
@@ -332,6 +349,10 @@ const SlotMachine = () => {
 
   const spin = useCallback(() => {
     if (isSpinning || spins <= 0) return;
+    if (winAudioRef.current) {
+      winAudioRef.current.pause();
+      winAudioRef.current = null;
+    }
     playSpinSound();
     setIsSpinning(true);
     setJackpot(false);
@@ -339,12 +360,11 @@ const SlotMachine = () => {
     setSpins((s) => s - 1);
 
     const pack = activePackRef.current;
-    const anchor = pack[Math.floor(Math.random() * N)];
-    const pick = () =>
-      Math.random() < biasRef.current
-        ? anchor
-        : pack[Math.floor(Math.random() * N)];
-    const finalEmojis = [anchor, pick(), pick()];
+    // bias only boosts jackpot — freespin outcomes stay purely random
+    const forced = Math.random() < biasRef.current;
+    const finalEmojis = forced
+      ? (() => { const a = pack[Math.floor(Math.random() * N)]; return [a, a, a]; })()
+      : Array.from({ length: 3 }, () => pack[Math.floor(Math.random() * N)]);
     const intervals = [null, null, null];
     const SPIN_MS = 65;
 
@@ -384,6 +404,10 @@ const SlotMachine = () => {
             const vals = Object.values(counts);
             if (vals.includes(3)) {
               setJackpot(true);
+              jackpotRef.current = true;
+              biasRef.current = 0;
+              setBias(0);
+              playWinSound();
               setSpins(0); // jackpot = end state, triggers outOfSpins
               const anim = Math.floor(Math.random() * 4) + 1;
               setVictoryAnim(anim);
@@ -433,13 +457,17 @@ const SlotMachine = () => {
     if (!victoryPlayingRef.current) setEndStateActive(true);
   }, [outOfSpins]);
 
-  // When end-state activates: halve bias, swap pack, animate reels
+  // When end-state activates: swap pack, animate reels.
+  // Bias: jackpot already reset it to 0; non-jackpot loss-streak halves it.
   useEffect(() => {
     if (!endStateActive) return;
 
-    const halfBias = biasRef.current / 2;
-    biasRef.current = halfBias;
-    setBias(halfBias);
+    if (!jackpotRef.current) {
+      const halfBias = biasRef.current / 2;
+      biasRef.current = halfBias;
+      setBias(halfBias);
+    }
+    jackpotRef.current = false;
 
     const next = randomPack(activePackRef.current);
     activePackRef.current = next;
