@@ -21,7 +21,8 @@
       "Bash(kubectl scale:*)",
       "Bash(while IFS= read -r f)",
       "Bash(do rm:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git rm:*)"
     ],
     "additionalDirectories": [
       "/Users/vedmedik/dev/partygames"
