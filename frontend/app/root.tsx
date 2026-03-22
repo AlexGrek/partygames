@@ -8,6 +8,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Party Games</title>
+        <link rel="icon" type="image/png" sizes="512x512" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f353/512.png" />
+        <link rel="icon" type="image/png" sizes="72x72" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f353/72.png" />
+        <link rel="apple-touch-icon" href="https://fonts.gstatic.com/s/e/notoemoji/latest/1f353/512.png" />
         <Meta />
         <Links />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

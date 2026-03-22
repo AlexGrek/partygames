@@ -16,6 +16,11 @@ export default function TopBar() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const app = APPS.find((a) => a.to === location.pathname);
+    document.title = app ? `${app.label} — Party Games` : "Party Games";
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {

@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { TrendingDown, TrendingUp, RefreshCw, Shuffle, BookOpen, X } from "lucide-react";
+import {
+  TrendingDown,
+  TrendingUp,
+  RefreshCw,
+  Shuffle,
+  BookOpen,
+  X,
+} from "lucide-react";
 
 const FALLBACK_WORDS: Record<number, string[]> = {
   1: ["кот", "дом"],
@@ -15,6 +22,22 @@ const LEVEL_COLORS: Record<number, string> = {
   3: "#eab308",
   4: "#f97316",
   5: "#ef4444",
+};
+
+const LEVEL_NAMES: Record<number, string> = {
+  1: "Легко",
+  2: "Нормально",
+  3: "Важко",
+  4: "Дуже важко",
+  5: "Пекло",
+};
+
+const LEVEL_DESC: Record<number, string> = {
+  1: "3–4 літери",
+  2: "5–6 літер",
+  3: "7–8 літер",
+  4: "9–10 літер",
+  5: "11+ літер",
 };
 
 const LS_PREFIX = "croc-used-";
@@ -61,7 +84,8 @@ async function fetchWords(level: number): Promise<string[]> {
 
 const DEFAULT_CAPABILITY = "llm.huihui_ai/qwen3.5-abliterated:2B";
 const DEFAULT_REQUEST = `Поясни значення слова "{word}"`;
-const DEFAULT_SYSTEM = "Ти - дуже розумний помічник, який може допомогти пояснити значення слів українською мовою. Ти відповідаєш коротко, але чітко.";
+const DEFAULT_SYSTEM =
+  "Ти - дуже розумний помічник з почуттям гумору, який може допомогти пояснити значення слів українською мовою. Ти відповідаєш коротко, але чітко.";
 const OFFLOADMQ_API = "/api/v1/offloadmq";
 const DB_API = "/api/v1/keys";
 
@@ -83,6 +107,8 @@ export default function Crocodile() {
   const [currentWord, setCurrentWord] = useState<string>("");
   const [currentLevel, setCurrentLevel] = useState<number>(2);
   const [loading, setLoading] = useState(true);
+  const [phase, setPhase] = useState<"start" | "game">("start");
+  const [startExiting, setStartExiting] = useState(false);
   // key increments on each new word to reset CSS animations
   const [wordKey, setWordKey] = useState(0);
   // elapsed seconds shown above the word (null = not started yet)
@@ -92,7 +118,11 @@ export default function Crocodile() {
   const [explanation, setExplanation] = useState<string | null>(null);
   const [explainError, setExplainError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const explainConfigRef = useRef<{ capability: string; request: string; system: string } | null>(null);
+  const explainConfigRef = useRef<{
+    capability: string;
+    request: string;
+    system: string;
+  } | null>(null);
 
   const timerStartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -119,7 +149,6 @@ export default function Crocodile() {
       explainConfigRef.current = { capability, request, system };
       setAllWords(result);
       setLoading(false);
-      pickWordFrom(2, result);
     }
     loadWords();
     return () => {
@@ -157,9 +186,12 @@ export default function Crocodile() {
     try {
       // 1. Check cache in DB
       const cacheKey = `croc::explanation::${word}`;
-      const cacheRes = await fetch(`${DB_API}/${encodeURIComponent(cacheKey)}`, {
-        signal: ctrl.signal,
-      });
+      const cacheRes = await fetch(
+        `${DB_API}/${encodeURIComponent(cacheKey)}`,
+        {
+          signal: ctrl.signal,
+        },
+      );
       if (cacheRes.ok) {
         const cached = await cacheRes.json();
         if (typeof cached.value === "string" && cached.value) {
@@ -170,14 +202,21 @@ export default function Crocodile() {
       }
 
       // 2. Ask LLM via OffloadMQ
-      const cfg = explainConfigRef.current ?? { capability: DEFAULT_CAPABILITY, request: DEFAULT_REQUEST, system: DEFAULT_SYSTEM };
+      const cfg = explainConfigRef.current ?? {
+        capability: DEFAULT_CAPABILITY,
+        request: DEFAULT_REQUEST,
+        system: DEFAULT_SYSTEM,
+      };
       const prompt = cfg.request.replace("{word}", word);
       const requestBody = {
         capability: cfg.capability,
         payload: { prompt, system: cfg.system },
         urgent: true,
       };
-      console.log("[explain] sending to OffloadMQ:\n" + JSON.stringify(requestBody, null, 2));
+      console.log(
+        "[explain] sending to OffloadMQ:\n" +
+          JSON.stringify(requestBody, null, 2),
+      );
 
       const res = await fetch(`${OFFLOADMQ_API}/api/task/submit_blocking`, {
         method: "POST",
@@ -194,7 +233,11 @@ export default function Crocodile() {
 
       const data = await res.json();
       console.log("[explain] response:", JSON.stringify(data, null, 2));
-      const text: string = data?.result?.message?.content ?? data?.result?.response ?? data?.result?.stdout ?? "";
+      const text: string =
+        data?.result?.message?.content ??
+        data?.result?.response ??
+        data?.result?.stdout ??
+        "";
       if (!text) throw new Error("Empty response from LLM");
 
       setExplanation(text);
@@ -250,6 +293,15 @@ export default function Crocodile() {
     pickWord(currentLevel);
   }
 
+  function handleLevelStart(level: number) {
+    setStartExiting(true);
+    setTimeout(() => {
+      pickWordFrom(level, allWords);
+      setPhase("game");
+      setStartExiting(false);
+    }, 380);
+  }
+
   const color = LEVEL_COLORS[currentLevel];
   const fillPercent = (currentLevel / 5) * 100;
   const charCount = currentWord.length || 1;
@@ -259,7 +311,123 @@ export default function Crocodile() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <span className="text-neutral-400 text-xl">Loading...</span>
+        <span
+          style={{
+            fontFamily: "'Russo One', sans-serif",
+            fontSize: "4rem",
+            animation: "floatCroc 2s ease-in-out infinite",
+            display: "inline-block",
+          }}
+        >
+          🐊
+        </span>
+      </div>
+    );
+  }
+
+  if (phase === "start") {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-4 gap-10"
+        style={{
+          animation: startExiting
+            ? "fadeOutScale 0.38s ease forwards"
+            : undefined,
+        }}
+      >
+        {/* Title */}
+        <div className="flex flex-col items-center gap-3">
+          <span
+            style={{
+              fontSize: "min(22vw, 6rem)",
+              animation: "floatCroc 3s ease-in-out infinite",
+              display: "inline-block",
+            }}
+          >
+            🐊
+          </span>
+          <h1
+            style={{
+              fontFamily: "'Russo One', sans-serif",
+              fontSize: "min(15vw, 4.5rem)",
+              letterSpacing: "0.05em",
+              animation: "glowPulse 3s ease-in-out infinite",
+              color: "#22c55e",
+            }}
+          >
+            CrocoDildo
+          </h1>
+          <p className="text-neutral-400 text-sm text-center max-w-xs">
+            Пояснюй слово без слів — команда вгадує!
+          </p>
+        </div>
+
+        {/* Level cards */}
+        <div className="flex flex-col gap-3 w-full max-w-sm">
+          {([1, 2, 3, 4, 5] as const).map((lvl, i) => {
+            const c = LEVEL_COLORS[lvl];
+            return (
+              <button
+                key={lvl}
+                onClick={() => handleLevelStart(lvl)}
+                style={{
+                  animation: `slideInUp 0.45s cubic-bezier(0.22,1,0.36,1) both`,
+                  animationDelay: `${i * 0.07}s`,
+                  borderColor: `${c}55`,
+                  background: `${c}0d`,
+                  boxShadow: `0 0 0 0 ${c}00`,
+                  transition:
+                    "box-shadow 0.2s, background 0.2s, transform 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    `0 0 24px ${c}40`;
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    `${c}22`;
+                  (e.currentTarget as HTMLButtonElement).style.transform =
+                    "scale(1.02)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                    `0 0 0 0 ${c}00`;
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    `${c}0d`;
+                  (e.currentTarget as HTMLButtonElement).style.transform =
+                    "scale(1)";
+                }}
+                className="flex items-center justify-between px-5 py-4 rounded-2xl border text-left"
+              >
+                <div className="flex items-center gap-4">
+                  {/* color dot */}
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}` }}
+                  />
+                  <div>
+                    <div
+                      className="font-bold text-base leading-tight"
+                      style={{
+                        color: c,
+                        fontFamily: "'Russo One', sans-serif",
+                      }}
+                    >
+                      {LEVEL_NAMES[lvl]}
+                    </div>
+                    <div className="text-neutral-500 text-xs mt-0.5">
+                      {LEVEL_DESC[lvl]}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className="text-xs font-mono font-bold px-2 py-1 rounded-lg"
+                  style={{ color: c, background: `${c}22` }}
+                >
+                  {lvl}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -271,17 +439,23 @@ export default function Crocodile() {
         onClick={handleReset}
         className="absolute top-20 right-4 text-xs text-neutral-500 hover:text-neutral-300 border border-neutral-700 hover:border-neutral-500 px-2 py-1 rounded transition-colors"
       >
-        reset
+        скинути
+      </button>
+
+      {/* Back to start */}
+      <button
+        onClick={() => setPhase("start")}
+        className="absolute top-20 left-4 text-xs text-neutral-500 hover:text-neutral-300 border border-neutral-700 hover:border-neutral-500 px-2 py-1 rounded transition-colors"
+      >
+        ← рівень
       </button>
 
       {/* Timer — breathes at 00:00 during grace period, then counts up */}
       <div className="h-8 flex items-center justify-center">
         <span
-          className="font-mono tabular-nums text-2xl font-bold"
+          className="font-mono tabular-nums text-sm"
           style={{
-            color,
-            textShadow: elapsed !== null ? `0 0 12px ${color}80` : undefined,
-            animation: elapsed === null ? "breathe 1s ease-in-out infinite" : undefined,
+            color: "rgba(255,255,255,0.25)",
           }}
         >
           {elapsed === null
@@ -325,7 +499,7 @@ export default function Crocodile() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-neutral-400 hover:text-neutral-200 text-sm transition-all"
           >
             <BookOpen size={15} />
-            Explain word
+            Пояснити слово (це довго)
           </button>
         )}
 
@@ -344,13 +518,13 @@ export default function Crocodile() {
                   animation: "spin 0.8s linear infinite",
                 }}
               />
-              Thinking…
+              Думаю…
               <button
                 onClick={cancelExplain}
                 className="ml-1 flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
               >
                 <X size={12} />
-                cancel
+                скасувати
               </button>
             </div>
             {/* shimmer placeholder lines */}
@@ -361,7 +535,8 @@ export default function Crocodile() {
                   className="h-2.5 rounded-full"
                   style={{
                     width: `${w}%`,
-                    background: "linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%)",
+                    background:
+                      "linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%)",
                     backgroundSize: "200% 100%",
                     animation: `shimmer 1.5s ease-in-out infinite`,
                     animationDelay: `${i * 0.15}s`,
@@ -413,7 +588,7 @@ export default function Crocodile() {
           className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed transition-all"
         >
           <TrendingDown size={24} />
-          <span className="text-sm font-medium">Easier next</span>
+          <span className="text-sm font-medium">Легше</span>
         </button>
 
         <button
@@ -422,7 +597,7 @@ export default function Crocodile() {
           className="flex flex-col items-center justify-center gap-2 py-5 rounded-2xl border border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed transition-all"
         >
           <TrendingUp size={24} />
-          <span className="text-sm font-medium">Harder next</span>
+          <span className="text-sm font-medium">Складніше</span>
         </button>
 
         <button
@@ -436,7 +611,7 @@ export default function Crocodile() {
           }}
         >
           <RefreshCw size={24} />
-          <span className="text-sm font-medium">Same next</span>
+          <span className="text-sm font-medium">Цей самий рівень</span>
         </button>
 
         <button
@@ -448,7 +623,7 @@ export default function Crocodile() {
           }}
         >
           <Shuffle size={24} />
-          <span className="text-sm font-medium">Random next</span>
+          <span className="text-sm font-medium">Випадковий рівень</span>
         </button>
       </div>
     </div>

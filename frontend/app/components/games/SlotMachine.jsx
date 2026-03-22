@@ -521,25 +521,25 @@ const SlotMachine = () => {
         onClick={spin}
         disabled={isSpinning || outOfSpins}
       >
-        {isSpinning ? "SPINNING..." : "PULL LEVER"}
+        {isSpinning ? "КРУТИТЬСЯ..." : "КРУТИТИ"}
       </button>
 
       <div className="message-zone">
         {showFreeSpin && (
-          <h2 className="free-spin-text">✨ FREE SPIN! ✨</h2>
+          <h2 className="free-spin-text">✨ БЕЗКОШТОВНИЙ КРУТ! ✨</h2>
         )}
 
         {!outOfSpins && !showFreeSpin && (
           <p className="spin-count">
-            {spins} spin{spins !== 1 ? "s" : ""} left
+            {spins} {spins === 1 ? "крут" : spins >= 2 && spins <= 4 ? "крути" : "крутів"} залишилось
           </p>
         )}
 
         {endStateActive && (
           <div className="add-spins-zone">
             {jackpot
-              ? <h2 className="victory-text">🎊 JACKPOT! 🎊</h2>
-              : <p className="out-of-spins-text">No spins left</p>
+              ? <h2 className="victory-text">🎊 ДЖЕКПОТ! 🎊</h2>
+              : <p className="out-of-spins-text">Крути скінчились</p>
             }
             <div className="add-spins-buttons">
               {addCounts.map((n, i) => (
@@ -551,7 +551,7 @@ const SlotMachine = () => {
                     setJackpot(false);
                   }}
                 >
-                  Add {n} spins
+                  +{n} {n === 1 ? "крут" : n >= 2 && n <= 4 ? "крути" : "крутів"}
                 </button>
               ))}
             </div>
