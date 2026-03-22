@@ -443,10 +443,11 @@ const SlotMachine = () => {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.code === "Space" || e.code === "Enter") {
-        e.preventDefault();
-        spin();
-      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      spin();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
