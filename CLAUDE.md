@@ -62,7 +62,10 @@ Single-file Go HTTP server using stdlib `net/http`. Flags:
 - `-static` — directory to serve as frontend; omit to run API-only (used in local dev)
 
 All KV data lives in a single bbolt bucket named `"kv"`. Values are raw JSON bytes.
-API documented in `backend/API.md`, all routes under `/api/v1/keys`.
+API documented in `backend/API.md`. Three route groups:
+- `/api/v1/keys` — KV store (GET list, GET/PUT/DELETE single key)
+- `/api/v1/files` — JSON directory listing + WebDAV (PROPFIND, MKCOL, PUT, DELETE) for the Files app
+- `/api/v1/offloadmq/*` — reverse proxy to `offloadmq.alexgr.space`; injects `X-API-Key` header and `apiKey` JSON field server-side
 
 ### Frontend (`frontend/`)
 React Router v7 in **SPA mode** (`ssr: false`). Routes declared in `app/routes.ts`, implemented
@@ -74,7 +77,10 @@ Build output: `frontend/build/client/` — this directory is gitignored and copi
 ### Adding a new route
 1. Create `app/routes/<name>.tsx` with a default export component.
 2. Register in `app/routes.ts`: `route("<path>", "routes/<name>.tsx")`.
-3. Optionally link from `app/routes/home.tsx`.
+3. Add an entry to `app/apps.ts` (the `APPS` constant) so it appears on the home page and in the nav menu.
+
+### App registry (`app/apps.ts`)
+`APPS` is the single source of truth for app metadata (name, path, emoji, section). Home page and the hamburger nav both read from it. Always add new apps here.
 
 ## Kubernetes / Helm
 
