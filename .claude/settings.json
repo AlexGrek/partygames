@@ -15,7 +15,13 @@
       "Bash(brew install:*)",
       "Bash(python3 -m venv /Users/vedmedik/dev/partygames/.venv-yt)",
       "Bash(/Users/vedmedik/dev/partygames/.venv-yt/bin/pip install:*)",
-      "Bash(ffmpeg -i \"/Users/vedmedik/dev/partygames/oiiai/OIIAOIIA EXTENDED [RZHi6agHUcQ].webm\" -t 3 -vn -acodec libmp3lame -q:a 2 \"/Users/vedmedik/dev/partygames/oiiai/preview.mp3\" -y)"
+      "Bash(ffmpeg -i \"/Users/vedmedik/dev/partygames/oiiai/OIIAOIIA EXTENDED [RZHi6agHUcQ].webm\" -t 3 -vn -acodec libmp3lame -q:a 2 \"/Users/vedmedik/dev/partygames/oiiai/preview.mp3\" -y)",
+      "Bash(ffmpeg -ss 6 -i \"/Users/vedmedik/dev/partygames/oiiai/Oiiai Cat Psytrance Remix [bN1shALfJqg].webm\" -vn -acodec libmp3lame -q:a 2 \"/Users/vedmedik/dev/partygames/oiiai/psytrance.mp3\" -y)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl scale:*)",
+      "Bash(while IFS= read -r f)",
+      "Bash(do rm:*)",
+      "Bash(done)"
     ],
     "additionalDirectories": [
       "/Users/vedmedik/dev/partygames"
