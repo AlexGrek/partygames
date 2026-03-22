@@ -360,11 +360,14 @@ const SlotMachine = () => {
     setSpins((s) => s - 1);
 
     const pack = activePackRef.current;
-    // bias only boosts jackpot — freespin outcomes stay purely random
-    const forced = Math.random() < biasRef.current;
-    const finalEmojis = forced
-      ? (() => { const a = pack[Math.floor(Math.random() * N)]; return [a, a, a]; })()
-      : Array.from({ length: 3 }, () => pack[Math.floor(Math.random() * N)]);
+    // Original per-reel mechanic: bias=0.85 → ~72% jackpot (quadratic), not 85% (linear).
+    // At high bias, P(loss) ≈ (1-bias)² → near zero, so bias self-stabilises and stops climbing.
+    const anchor = pack[Math.floor(Math.random() * N)];
+    const pick = () =>
+      Math.random() < biasRef.current
+        ? anchor
+        : pack[Math.floor(Math.random() * N)];
+    const finalEmojis = [anchor, pick(), pick()];
     const intervals = [null, null, null];
     const SPIN_MS = 65;
 
