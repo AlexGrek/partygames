@@ -325,8 +325,14 @@ const SlotMachine = () => {
     doStep();
   }, []);
 
+  const playSpinSound = useCallback(() => {
+    const audio = new Audio("/api/v1/files/slop/spin.mp3");
+    audio.play().catch((e) => console.warn("[slop] spin sound not found:", e));
+  }, []);
+
   const spin = useCallback(() => {
     if (isSpinning || spins <= 0) return;
+    playSpinSound();
     setIsSpinning(true);
     setJackpot(false);
     setShowFreeSpin(false);

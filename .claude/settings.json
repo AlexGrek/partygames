@@ -14,7 +14,8 @@
       "Bash(pip3 install:*)",
       "Bash(brew install:*)",
       "Bash(python3 -m venv /Users/vedmedik/dev/partygames/.venv-yt)",
-      "Bash(/Users/vedmedik/dev/partygames/.venv-yt/bin/pip install:*)"
+      "Bash(/Users/vedmedik/dev/partygames/.venv-yt/bin/pip install:*)",
+      "Bash(ffmpeg -i \"/Users/vedmedik/dev/partygames/oiiai/OIIAOIIA EXTENDED [RZHi6agHUcQ].webm\" -t 3 -vn -acodec libmp3lame -q:a 2 \"/Users/vedmedik/dev/partygames/oiiai/preview.mp3\" -y)"
     ],
     "additionalDirectories": [
       "/Users/vedmedik/dev/partygames"
