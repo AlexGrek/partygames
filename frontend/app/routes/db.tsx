@@ -245,27 +245,119 @@ type ModalState =
   | { type: "delete"; key: string }
   | null;
 
-function buildTree(keys: string[]): { ungrouped: string[]; groups: { prefix: string; keys: string[] }[] } {
-  const groupMap = new Map<string, string[]>();
+type TreeNode = {
+  name: string;
+  path: string;
+  leaves: string[];
+  children: TreeNode[];
+};
+
+function countAll(node: TreeNode): number {
+  return node.leaves.length + node.children.reduce((s, c) => s + countAll(c), 0);
+}
+
+function buildTree(keys: string[]): { ungrouped: string[]; roots: TreeNode[] } {
   const ungrouped: string[] = [];
+  const nodeMap = new Map<string, TreeNode>();
+  const rootOrder: string[] = [];
+
+  function getOrCreate(path: string): TreeNode {
+    if (nodeMap.has(path)) return nodeMap.get(path)!;
+    const parts = path.split("::");
+    const node: TreeNode = { name: parts[parts.length - 1], path, leaves: [], children: [] };
+    nodeMap.set(path, node);
+    if (parts.length === 1) {
+      rootOrder.push(path);
+    } else {
+      getOrCreate(parts.slice(0, -1).join("::")).children.push(node);
+    }
+    return node;
+  }
+
   for (const key of keys) {
-    const sep = key.indexOf("::");
-    if (sep === -1) {
+    const parts = key.split("::");
+    if (parts.length === 1) {
       ungrouped.push(key);
     } else {
-      const prefix = key.slice(0, sep);
-      if (!groupMap.has(prefix)) groupMap.set(prefix, []);
-      groupMap.get(prefix)!.push(key);
+      getOrCreate(parts.slice(0, -1).join("::")).leaves.push(key);
     }
   }
-  const groups = Array.from(groupMap.entries()).map(([prefix, ks]) => ({ prefix, keys: ks }));
-  return { ungrouped, groups };
+
+  return { ungrouped, roots: rootOrder.map((n) => nodeMap.get(n)!) };
+}
+
+function TreeGroup({
+  node,
+  depth,
+  expanded,
+  setExpanded,
+  selectedKey,
+  selectKey,
+}: {
+  node: TreeNode;
+  depth: number;
+  expanded: Set<string>;
+  setExpanded: React.Dispatch<React.SetStateAction<Set<string>>>;
+  selectedKey: string | null;
+  selectKey: (key: string) => void;
+}) {
+  const isExpanded = expanded.has(node.path);
+  const pl = 12 + depth * 12;
+
+  const toggle = () =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(node.path) ? next.delete(node.path) : next.add(node.path);
+      return next;
+    });
+
+  return (
+    <div>
+      <button
+        onClick={toggle}
+        style={{ paddingLeft: `${pl}px` }}
+        className="w-full text-left pr-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-300 hover:bg-white/5 transition-colors uppercase tracking-wider"
+      >
+        <ChevronRight size={12} className={`shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+        {node.name}
+        <span className="ml-auto font-normal normal-case tracking-normal opacity-50">{countAll(node)}</span>
+      </button>
+      {isExpanded && (
+        <>
+          {node.children.map((child) => (
+            <TreeGroup
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              expanded={expanded}
+              setExpanded={setExpanded}
+              selectedKey={selectedKey}
+              selectKey={selectKey}
+            />
+          ))}
+          {node.leaves.map((key) => (
+            <button
+              key={key}
+              onClick={() => selectKey(key)}
+              style={{ paddingLeft: `${pl + 16}px` }}
+              className={`w-full text-left py-2 pr-3 text-xs font-mono truncate transition-colors ${
+                selectedKey === key ? "bg-neutral-700 text-white" : "text-neutral-300 hover:bg-white/8"
+              }`}
+              title={key}
+            >
+              {key.slice(node.path.length + 2)}
+            </button>
+          ))}
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function DbViewer() {
   const [keys, setKeys] = useState<string[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [value, setValue] = useState<unknown>(null);
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [loadingValue, setLoadingValue] = useState(false);
@@ -377,51 +469,32 @@ export default function DbViewer() {
               ) : keys.length === 0 ? (
                 <div className="p-4 text-sm text-neutral-500">No keys found.</div>
               ) : (() => {
-                const { ungrouped, groups } = buildTree(keys);
-                const keyBtn = (key: string, indent = false) => (
-                  <button
-                    key={key}
-                    onClick={() => selectKey(key)}
-                    className={`w-full text-left py-2 text-xs font-mono truncate transition-colors ${
-                      indent ? "pl-6 pr-3" : "px-4"
-                    } ${
-                      selectedKey === key
-                        ? "bg-neutral-700 text-white"
-                        : "text-neutral-300 hover:bg-white/8"
-                    }`}
-                    title={key}
-                  >
-                    {key}
-                  </button>
-                );
+                const { ungrouped, roots } = buildTree(keys);
                 return (
                   <>
-                    {ungrouped.map((k) => keyBtn(k))}
-                    {groups.map(({ prefix, keys: gkeys }) => {
-                      const isCollapsed = collapsed.has(prefix);
-                      return (
-                        <div key={prefix}>
-                          <button
-                            onClick={() =>
-                              setCollapsed((prev) => {
-                                const next = new Set(prev);
-                                next.has(prefix) ? next.delete(prefix) : next.add(prefix);
-                                return next;
-                              })
-                            }
-                            className="w-full text-left px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-300 hover:bg-white/5 transition-colors uppercase tracking-wider"
-                          >
-                            <ChevronRight
-                              size={12}
-                              className={`shrink-0 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
-                            />
-                            {prefix}
-                            <span className="ml-auto font-normal normal-case tracking-normal opacity-50">{gkeys.length}</span>
-                          </button>
-                          {!isCollapsed && gkeys.map((k) => keyBtn(k, true))}
-                        </div>
-                      );
-                    })}
+                    {ungrouped.map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => selectKey(k)}
+                        className={`w-full text-left px-4 py-2 text-xs font-mono truncate transition-colors ${
+                          selectedKey === k ? "bg-neutral-700 text-white" : "text-neutral-300 hover:bg-white/8"
+                        }`}
+                        title={k}
+                      >
+                        {k}
+                      </button>
+                    ))}
+                    {roots.map((node) => (
+                      <TreeGroup
+                        key={node.path}
+                        node={node}
+                        depth={0}
+                        expanded={expanded}
+                        setExpanded={setExpanded}
+                        selectedKey={selectedKey}
+                        selectKey={selectKey}
+                      />
+                    ))}
                   </>
                 );
               })()}

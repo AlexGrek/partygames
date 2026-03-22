@@ -426,6 +426,9 @@ const SlotMachine = () => {
               }, 4000);
             } else if (vals.includes(2)) {
               setSpins((s) => s + 1);
+              const freeSpinBias = Math.min(biasRef.current + biasIncRef.current * 0.35, 0.85);
+              biasRef.current = freeSpinBias;
+              setBias(freeSpinBias);
               setShowFreeSpin(true);
               setTimeout(() => setShowFreeSpin(false), 2200);
               setShakeClass("shake-light");
